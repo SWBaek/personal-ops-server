@@ -46,6 +46,10 @@ interface CreateAiMessageBody {
   reasoningEffort?: unknown;
 }
 
+interface ConfirmDestructiveBody {
+  confirmation?: unknown;
+}
+
 interface BuildAppOptions {
   store: OpsStore;
   aiChatService?: AiChatService;
@@ -139,6 +143,22 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     conversations: options.store.listAiConversations().map(publicConversation),
     archivedConversations: options.store.listArchivedAiConversations().map(publicConversation),
   }));
+
+  app.post<{ Body: ConfirmDestructiveBody }>("/api/ai/history/clear", async (request, reply) => {
+    requireConfirmation(request.body?.confirmation, "DELETE_AI_HISTORY");
+    if (options.store.hasActiveAiJobs()) {
+      return reply.code(409).send({ error: "진행 중인 AI 요청을 먼저 취소해주세요." });
+    }
+    return { deleted: options.store.clearAiHistory() };
+  });
+
+  app.post<{ Body: ConfirmDestructiveBody }>("/api/system/reset-data", async (request, reply) => {
+    requireConfirmation(request.body?.confirmation, "RESET_ALL_DATA");
+    if (options.store.hasActiveAiJobs()) {
+      return reply.code(409).send({ error: "진행 중인 AI 요청을 먼저 취소해주세요." });
+    }
+    return { deleted: options.store.resetAllData() };
+  });
 
   app.post<{ Body: CreateAiConversationBody }>("/api/ai/conversations", async (request, reply) => {
     requireAiConversationService(options.aiConversationService);
@@ -334,6 +354,10 @@ function requireUuid(value: unknown, field: string): string {
     throw new InputError(`${field} must be a UUID`);
   }
   return value;
+}
+
+function requireConfirmation(value: unknown, expected: string): void {
+  if (value !== expected) throw new InputError("destructive action confirmation does not match");
 }
 
 function publicConversation(conversation: ReturnType<OpsStore["createAiConversation"]>) {

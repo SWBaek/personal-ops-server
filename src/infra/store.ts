@@ -187,6 +187,17 @@ export interface CompleteAiJobInput {
   providerThreadId?: string;
 }
 
+export interface AiHistoryClearResult {
+  conversations: number;
+  messages: number;
+  jobs: number;
+}
+
+export interface DataResetResult extends AiHistoryClearResult {
+  captures: number;
+  tasks: number;
+}
+
 export class OpsStore {
   readonly #db: DatabaseSync;
 
@@ -201,6 +212,50 @@ export class OpsStore {
 
   close(): void {
     this.#db.close();
+  }
+
+  hasActiveAiJobs(): boolean {
+    return Boolean(this.#db.prepare(
+      "SELECT 1 FROM ai_jobs WHERE status IN ('queued', 'running') LIMIT 1",
+    ).get());
+  }
+
+  clearAiHistory(): AiHistoryClearResult {
+    if (this.hasActiveAiJobs()) throw new Error("active AI jobs prevent data deletion");
+    const result = this.#aiHistoryCounts();
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      this.#db.exec("DELETE FROM ai_jobs; DELETE FROM ai_messages; DELETE FROM ai_conversations;");
+      this.#db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      this.#db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  resetAllData(): DataResetResult {
+    if (this.hasActiveAiJobs()) throw new Error("active AI jobs prevent data deletion");
+    const result = {
+      captures: this.#rowCount("captures"),
+      tasks: this.#rowCount("tasks"),
+      ...this.#aiHistoryCounts(),
+    };
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      this.#db.exec(`
+        DELETE FROM ai_jobs;
+        DELETE FROM ai_messages;
+        DELETE FROM ai_conversations;
+        DELETE FROM tasks;
+        DELETE FROM captures;
+      `);
+      this.#db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      this.#db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   createCapture(body: string): Capture {
@@ -675,6 +730,19 @@ export class OpsStore {
        FROM ai_messages WHERE id = ?`,
     ).get(id) as unknown as AiMessageRow | undefined;
     return row ? mapAiMessage(row) : null;
+  }
+
+  #aiHistoryCounts(): AiHistoryClearResult {
+    return {
+      conversations: this.#rowCount("ai_conversations"),
+      messages: this.#rowCount("ai_messages"),
+      jobs: this.#rowCount("ai_jobs"),
+    };
+  }
+
+  #rowCount(table: "captures" | "tasks" | "ai_conversations" | "ai_messages" | "ai_jobs"): number {
+    const row = this.#db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
+    return row.count;
   }
 
   #nextAvailableAiAssistantSlot(): 1 | 2 | null {

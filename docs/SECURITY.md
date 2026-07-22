@@ -86,6 +86,7 @@ Proactive agents remain in Observe unless a specific pre-authorized automation c
 - Enforce domain invariants, authority, current-state preconditions, and idempotency deterministically.
 - Serialize conflicting writes.
 - Separate proposal and apply phases for Govern operations.
+- Require a separate final confirmation step for development data deletion, reject it while AI jobs are active, and limit it to explicitly enumerated application-owned tables in one transaction.
 - Store a receipt with actor/role, request, affected objects, before/after summary, evidence references, and undo information.
 - Fail closed when intent, target, authority, source, or current state is ambiguous.
 - Reconcile jobs after restart without blindly retrying a mutation whose outcome is uncertain.

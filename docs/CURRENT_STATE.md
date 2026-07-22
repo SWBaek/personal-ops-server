@@ -8,7 +8,7 @@ The product direction has been reset.
 
 The repository was initially implemented as a small personal task service with optional AI chat. That concept is now superseded. The target is an AI-dependent personal executive office with one chief-assistant front door, specialist roles, a shared evidence-backed operational ledger, typed mutations, receipts, and proactive follow-up.
 
-The running application is therefore a useful technical prototype, not a valid representation of the target product experience.
+The running application now presents the accepted baseline information architecture for the target product experience. Its responsive shell represents the intended hierarchy, but most operational content is visibly marked example data and is not yet backed by the target domain model.
 
 ## Reusable foundation already working
 
@@ -22,14 +22,18 @@ The running application is therefore a useful technical prototype, not a valid r
 - SQLite-backed conversations, messages, idempotent jobs, sanitized SSE, cancellation, and restart recovery.
 - Codex app-server text deltas over private stdio with buffered `codex exec` fallback; Grok streaming JSON.
 - Fixed empty AI working directory, provider concurrency locks, two-minute timeout, and bounded output.
-- Playwright Chromium coverage for responsive layout, conversation switching, archives, streaming, and reload recovery.
+- A chief-assistant-centered responsive shell for desktop, Galaxy Tab, and smartphone browsers.
+- Playwright Chromium coverage for the three device classes, context-drawer behavior, streaming, reload recovery, and browser API fallback.
+- Two-step development controls for clearing AI history or resetting all current application data without touching CLI, environment, or Tailscale configuration.
+- A viewport-fixed mobile shell where long conversations scroll inside the conversation region while the composer and bottom navigation remain reachable.
 - Type checking, unit/integration tests, production build, and verification scripts.
 
 ## Transitional or superseded product behavior
 
-- Capture and Today currently dominate the main view.
+- Capture and Task APIs remain in the backend but are no longer the visual center.
 - AI is read-only and cannot retrieve or operate on real project or knowledge context.
-- The primary/secondary assistant slots model assistants as conversation containers rather than roles over shared state.
+- The primary/secondary assistant-slot schema remains transitional backend state; the UI presents one chief assistant.
+- The briefing, project progress, approval, and recent-activity content in the new shell is labeled prototype data rather than canonical state.
 - Projects, people, meetings, decisions, dependencies, risks, knowledge artifacts, evidence provenance, receipts, and corrections do not exist in the application domain.
 - Current project documentation previously required useful operation without AI; that requirement is superseded.
 - No legacy WorkOS vault is required or connected. This is the intended default, not a missing runtime dependency.
@@ -56,7 +60,7 @@ Do not expand these transitional behaviors as if they were the target architectu
 The last implementation verification on Windows with Node.js 24.18.0 passed on 2026-07-22:
 
 - `npm run verify`;
-- 26 unit/integration tests and 7 Playwright tests;
+- 30 unit/integration tests and 10 Playwright tests;
 - TypeScript production build;
 - `npm audit --audit-level=moderate` with zero reported vulnerabilities;
 - local health endpoint and tailnet-served page;
@@ -64,9 +68,9 @@ The last implementation verification on Windows with Node.js 24.18.0 passed on 2
 
 This evidence validates the current infrastructure only. It does not validate the refounded assistant workflows.
 
-## Current documentation milestone
+## Current UI milestone
 
-The product constitution, architecture, security model, decision log, and refoundation plan now describe the new direction. No application code or legacy WorkOS data has been changed as part of this documentation milestone.
+The product constitution and first responsive information architecture now point in the same direction. The browser places one chief-assistant conversation at the center, keeps model controls secondary, and exposes operational context without requiring it to occupy the phone viewport. No legacy WorkOS data is connected or required.
 
 ## Recommended next milestone
 

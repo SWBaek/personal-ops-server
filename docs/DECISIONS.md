@@ -8,6 +8,22 @@ Each decision is marked **Active**, **Superseded**, or **Transitional**. Superse
 
 The application lives in an independent public repository outside the legacy personal vault. This isolates application code, runtime data, secrets, and release history from personal source material.
 
+## 2026-07-22 — Establish the responsive assistant shell before feature expansion
+
+**Status: Active**
+
+The first product-facing design artifact is a responsive chief-assistant workspace rather than a backend-driven collection of forms. The owner accepted this initial shell as the baseline information architecture. Desktop browsers, the owner's Galaxy Tab, and smartphone browsers are equally required targets. They share the same essential workflows while adapting composition: persistent navigation and operational context on wide screens, a context drawer on narrower tablets, and a single-column conversation with bottom navigation on phones.
+
+The chief-assistant conversation is the visual center. Projects, schedule, knowledge, inbox, proposals, evidence, and receipts are supporting inspection and control surfaces. Prototype content must be visibly marked as example data until it is backed by canonical application state.
+
+## 2026-07-22 — Provide explicit development data reset boundaries
+
+**Status: Active, development-stage control**
+
+The owner may clear all AI conversation history or reset all current application data from the settings UI. Both are destructive Govern operations: they require a separate final confirmation step, reject deletion while an AI job is queued or running, and execute as a database transaction. Typed confirmation is deferred while rapid development resets are frequent.
+
+Conversation clearing affects only assistant conversations, messages, and job records. Full reset additionally clears current capture and task records. Neither operation touches CLI authentication, environment configuration, Tailscale configuration, source files, or data outside the application-owned SQLite schema. The reset implementation must be updated explicitly when new canonical tables are introduced.
+
 ## 2026-07-22 — Keep legacy WorkOS optional and independent
 
 **Status: Active, clarified by the refoundation**
