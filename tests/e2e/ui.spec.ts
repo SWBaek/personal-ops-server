@@ -66,3 +66,20 @@ test("AI response streams and the conversation survives a reload", async ({ page
   await expect(page.locator("#ai-transcript")).toContainText("Playwright 대화 유지 확인");
   await expect(page.locator("#ai-transcript")).toContainText("스트리밍 응답 완료");
 });
+
+test("AI messages work when crypto.randomUUID is unavailable", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Crypto.prototype, "randomUUID", {
+      configurable: true,
+      value: undefined,
+    });
+  });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator("#ai-new-conversation").click();
+  await page.locator("#ai-message").fill("UUID 호환성 확인");
+  await page.locator("#ai-submit").click();
+
+  await expect(page.locator(".ai-message.user").last()).toContainText("UUID 호환성 확인");
+  await expect(page.locator(".ai-message.assistant").last().locator("p")).toHaveText("스트리밍 응답 완료");
+  await expect(page.locator("#ai-status")).toContainText("응답 완료");
+});

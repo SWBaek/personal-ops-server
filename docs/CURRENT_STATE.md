@@ -36,7 +36,7 @@ These are omitted to keep the first trust boundary small.
 Verified on Windows with Node.js 24.18.0 on 2026-07-22:
 
 - `npm run verify` passed;
-- 25 unit/integration tests and 4 Playwright browser tests passed with no failures;
+- 25 unit/integration tests and 5 Playwright browser tests passed with no failures;
 - TypeScript production build completed;
 - `npm audit --audit-level=moderate` reported zero vulnerabilities;
 - the built server answered `/api/health` successfully on `127.0.0.1:4310`;
