@@ -148,7 +148,12 @@ test("conversation HTTP APIs persist history and expose sanitized terminal SSE",
     const created = await app.inject({
       method: "POST",
       url: "/api/ai/conversations",
-      payload: { provider: "codex", model: "default", reasoningEffort: "default" },
+      payload: {
+        assistantSlot: 1,
+        provider: "codex",
+        model: "default",
+        reasoningEffort: "default",
+      },
     });
     assert.equal(created.statusCode, 201);
     const conversationId = created.json().conversation.id as string;

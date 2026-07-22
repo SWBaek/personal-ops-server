@@ -6,6 +6,7 @@ test("Galaxy Tab landscape shows AI chat in the right panel", async ({ page }, t
 
   await expect(page.getByRole("heading", { name: "지금 필요한 것만" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "AI에게 물어보기" })).toBeVisible();
+  await expect(page.locator(".assistant-slot")).toHaveCount(2);
   await expect(page.locator("#ai-provider option")).toHaveCount(2);
 
   const primaryBox = await page.locator(".primary-column").boundingBox();
@@ -49,9 +50,8 @@ test("browser interactions can capture and complete an isolated task", async ({ 
   await expect(page.locator("#open-list")).not.toContainText("Playwright isolated task");
 });
 
-test("AI response streams and the conversation survives a reload", async ({ page }) => {
+test("AI response streams and the conversation survives a reload", async ({ page }, testInfo) => {
   await page.goto("/", { waitUntil: "networkidle" });
-  await page.locator("#ai-new-conversation").click();
   await page.locator("#ai-message").fill("Playwright 대화 유지 확인");
   await page.locator("#ai-submit").click();
 
@@ -65,6 +65,11 @@ test("AI response streams and the conversation survives a reload", async ({ page
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.locator("#ai-transcript")).toContainText("Playwright 대화 유지 확인");
   await expect(page.locator("#ai-transcript")).toContainText("스트리밍 응답 완료");
+  await expect(page.locator("#ai-provider-control")).toBeHidden();
+  await page.screenshot({
+    path: testInfo.outputPath("assistant-conversation.png"),
+    fullPage: true,
+  });
 });
 
 test("AI messages work when crypto.randomUUID is unavailable", async ({ page }) => {
@@ -75,11 +80,41 @@ test("AI messages work when crypto.randomUUID is unavailable", async ({ page }) 
     });
   });
   await page.goto("/", { waitUntil: "networkidle" });
-  await page.locator("#ai-new-conversation").click();
   await page.locator("#ai-message").fill("UUID 호환성 확인");
   await page.locator("#ai-submit").click();
 
   await expect(page.locator(".ai-message.user").last()).toContainText("UUID 호환성 확인");
   await expect(page.locator(".ai-message.assistant").last().locator("p")).toHaveText("스트리밍 응답 완료");
   await expect(page.locator("#ai-status")).toContainText("응답 완료");
+});
+
+test("context reset preserves an archived transcript", async ({ page }) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.locator("#ai-reset-context").click();
+
+  await expect(page.locator("#ai-context-title")).toContainText("첫 메시지");
+  await expect(page.locator("#ai-history")).toBeVisible();
+  await page.locator("#ai-history summary").click();
+  await page.locator("#ai-history-list .history-item").first().click();
+  await expect(page.locator("#ai-status")).toContainText("읽기 전용 이전 문맥");
+  await expect(page.locator("#ai-transcript")).toContainText("UUID 호환성 확인");
+  await expect(page.locator("#ai-form")).toBeHidden();
+
+  await page.locator("#ai-return-current").click();
+  await expect(page.locator("#ai-form")).toBeVisible();
+});
+
+test("a secondary assistant keeps an independent context", async ({ page }) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator('.assistant-slot[data-slot="2"]').click();
+  await expect(page.locator("#ai-context-title")).toContainText("보조 비서");
+  await page.locator("#ai-message").fill("보조 비서 문맥 확인");
+  await page.locator("#ai-submit").click();
+  await expect(page.locator("#ai-status")).toContainText("응답 완료");
+
+  await page.locator('.assistant-slot[data-slot="1"]').click();
+  await expect(page.locator("#ai-transcript")).not.toContainText("보조 비서 문맥 확인");
+  await page.locator('.assistant-slot[data-slot="2"]').click();
+  await expect(page.locator("#ai-transcript")).toContainText("보조 비서 문맥 확인");
 });

@@ -26,7 +26,7 @@ Phone / Tablet / Remote PC
 
 ### Browser UI
 
-The UI is intentionally plain and dependency-light. It provides Capture, Today, open Tasks, completion, deferral, and durable read-only AI conversations. On wide screens, operational data stays in the primary column and AI chat uses a separate sticky right-side panel; narrow screens collapse to one column. The UI does not expose a shell, arbitrary flags, or arbitrary path input.
+The UI is intentionally plain and dependency-light. It provides Capture, Today, open Tasks, completion, deferral, and durable read-only AI conversations. On wide screens, operational data stays in the primary column and AI chat uses a separate sticky right-side panel; narrow screens collapse to one column. AI chat exposes one primary and one optional secondary assistant rather than an unlimited session list. The transcript owns the available space, the composer stays at the bottom, and provider/model/reasoning controls use compact progressive disclosure. The UI does not expose a shell, arbitrary flags, or arbitrary path input.
 
 ### HTTP service
 
@@ -34,7 +34,7 @@ Fastify owns input validation, domain operations, static assets, and future auth
 
 ### Domain and storage
 
-SQLite is the canonical operational store. The schema contains captures, tasks, AI conversations, messages, and durable jobs. Future tables may include projects, notes, approvals, and audit events.
+SQLite is the canonical operational store. The schema contains captures, tasks, AI conversations, messages, and durable jobs. AI conversations belong to one of two assistant slots and may be archived when their context is reset; archival never deletes their messages or jobs. Future tables may include projects, notes, approvals, and audit events.
 
 Long documents and attachments may remain normal files with database references. Export must produce readable Markdown or JSON.
 

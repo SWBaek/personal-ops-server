@@ -64,6 +64,8 @@ test("browser UI places AI chat in a separate side panel", async () => {
     const response = await app.inject({ method: "GET", url: "/" });
     assert.equal(response.statusCode, 200);
     assert.match(response.body, /<aside class="ai-panel" aria-label="AI 채팅">/);
+    assert.match(response.body, /id="ai-assistant-switcher"/);
+    assert.doesNotMatch(response.body, /id="ai-conversation"/);
     assert.match(response.body, /id="ai-provider"/);
     assert.match(response.body, /id="ai-model"/);
     assert.match(response.body, /id="ai-reasoning"/);

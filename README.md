@@ -11,7 +11,7 @@ The repository contains:
 - a working local Fastify server;
 - SQLite-backed Capture and Task primitives;
 - a minimal browser UI;
-- durable, read-only Codex and Grok CLI conversations with streaming, cancellation, model, and reasoning controls;
+- one primary and one optional secondary AI assistant, with durable archived contexts, streaming, cancellation, and compact model/reasoning controls;
 - non-invasive CLI availability checks;
 - product, architecture, security, and handoff documents;
 - tests for core workflows, durable AI jobs, SSE delivery, and responsive browser behavior.

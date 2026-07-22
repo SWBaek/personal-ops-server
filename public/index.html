@@ -94,56 +94,71 @@
 
       <aside class="ai-panel" aria-label="AI 채팅">
         <section class="card ai-card">
-          <div class="section-title">
+          <div class="ai-header">
             <div>
               <p class="eyebrow">AI CHAT</p>
               <h2>AI에게 물어보기</h2>
             </div>
             <span id="ai-status" class="status" aria-live="polite"></span>
           </div>
-          <div class="ai-conversation-bar">
-            <label>
-              대화
-              <select id="ai-conversation" name="conversation">
-                <option value="">새 대화</option>
-              </select>
-            </label>
-            <button id="ai-new-conversation" class="quiet" type="button">새 대화</button>
-          </div>
-          <form id="ai-form" class="ai-form">
-            <div class="ai-controls">
-              <label>
-                제공자
-                <select id="ai-provider" name="provider"></select>
-              </label>
-              <label>
-                모델
-                <select id="ai-model" name="model"></select>
-              </label>
-              <label>
-                추론 수준
-                <select id="ai-reasoning" name="reasoningEffort"></select>
-              </label>
+
+          <nav id="ai-assistant-switcher" class="ai-assistant-switcher" aria-label="비서 선택">
+            <button class="assistant-slot" type="button" data-slot="1">주 비서</button>
+            <button class="assistant-slot" type="button" data-slot="2">+ 보조 비서</button>
+          </nav>
+
+          <div class="ai-context-bar">
+            <div class="ai-context-copy">
+              <strong id="ai-assistant-name">주 비서</strong>
+              <span id="ai-context-title">아직 대화 없음</span>
             </div>
-            <label>
-              메시지
-              <textarea
-                id="ai-message"
-                name="message"
-                rows="5"
-                maxlength="8000"
-                placeholder="궁금한 내용을 입력하세요"
-                required
-              ></textarea>
-            </label>
-            <div class="ai-submit-row">
-              <button id="ai-submit" type="submit">보내기</button>
-              <button id="ai-cancel" class="quiet" type="button" hidden>취소</button>
+            <div class="ai-context-actions">
+              <span id="ai-provider-badge" class="ai-badge" hidden></span>
+              <button id="ai-return-current" class="text-button" type="button" hidden>현재 문맥</button>
+              <button id="ai-reset-context" class="text-button" type="button" hidden>맥락 초기화</button>
+            </div>
+          </div>
+
+          <details id="ai-history" class="ai-history" hidden>
+            <summary>이전 문맥 <span id="ai-history-count"></span></summary>
+            <div id="ai-history-list" class="ai-history-list"></div>
+          </details>
+
+          <div id="ai-transcript" class="ai-transcript" aria-live="polite">
+            <p class="empty">메시지를 보내면 비서가 이 문맥을 이어갑니다.</p>
+          </div>
+
+          <form id="ai-form" class="ai-form">
+            <label class="visually-hidden" for="ai-message">메시지</label>
+            <textarea
+              id="ai-message"
+              name="message"
+              rows="3"
+              maxlength="8000"
+              placeholder="비서에게 메시지 보내기"
+              required
+            ></textarea>
+            <div class="ai-composer-footer">
+              <div class="ai-controls" aria-label="AI 응답 설정">
+                <label id="ai-provider-control" class="compact-select">
+                  <span class="visually-hidden">제공자</span>
+                  <select id="ai-provider" name="provider" aria-label="제공자"></select>
+                </label>
+                <label class="compact-select">
+                  <span class="visually-hidden">모델</span>
+                  <select id="ai-model" name="model" aria-label="모델"></select>
+                </label>
+                <label class="compact-select">
+                  <span class="visually-hidden">추론 수준</span>
+                  <select id="ai-reasoning" name="reasoningEffort" aria-label="추론 수준"></select>
+                </label>
+              </div>
+              <div class="ai-submit-row">
+                <button id="ai-cancel" class="quiet" type="button" hidden>취소</button>
+                <button id="ai-submit" type="submit">보내기</button>
+              </div>
             </div>
           </form>
-          <div id="ai-transcript" class="ai-transcript" aria-live="polite">
-            <p class="empty">대화는 이 서버에 저장되며 읽기 전용 AI 요청으로 이어집니다.</p>
-          </div>
         </section>
       </aside>
     </main>

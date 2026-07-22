@@ -33,11 +33,13 @@ export type AiJobStatus =
 
 export interface AiConversation {
   id: string;
+  assistantSlot: 1 | 2;
   provider: AiProviderId;
   title: string;
   defaultModel: string;
   defaultReasoningEffort: string;
   providerThreadId: string | null;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -96,11 +98,13 @@ interface TaskRow {
 
 interface AiConversationRow {
   id: string;
+  assistant_slot: 1 | 2;
   provider: AiProviderId;
   title: string;
   default_model: string;
   default_reasoning_effort: string;
   provider_thread_id: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -152,6 +156,7 @@ export interface UpdateTaskInput {
 }
 
 export interface CreateAiConversationInput {
+  assistantSlot?: 1 | 2;
   provider: AiProviderId;
   model: string;
   reasoningEffort: string;
@@ -317,41 +322,63 @@ export class OpsStore {
   }
 
   createAiConversation(input: CreateAiConversationInput): AiConversation {
+    const assistantSlot = input.assistantSlot ?? this.#nextAvailableAiAssistantSlot();
+    if (!assistantSlot) throw new Error("AI assistant limit reached");
+    const occupied = this.#db.prepare(
+      "SELECT id FROM ai_conversations WHERE assistant_slot = ? AND archived_at IS NULL",
+    ).get(assistantSlot);
+    if (occupied) throw new Error("AI assistant slot is already occupied");
     const timestamp = new Date().toISOString();
     const conversation: AiConversation = {
       id: randomUUID(),
+      assistantSlot,
       provider: input.provider,
       title: "새 대화",
       defaultModel: input.model,
       defaultReasoningEffort: input.reasoningEffort,
       providerThreadId: null,
+      archivedAt: null,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
     this.#db.prepare(
       `INSERT INTO ai_conversations
-        (id, provider, title, default_model, default_reasoning_effort,
-         provider_thread_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, assistant_slot, provider, title, default_model, default_reasoning_effort,
+         provider_thread_id, archived_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       conversation.id,
+      conversation.assistantSlot,
       conversation.provider,
       conversation.title,
       conversation.defaultModel,
       conversation.defaultReasoningEffort,
       conversation.providerThreadId,
+      conversation.archivedAt,
       conversation.createdAt,
       conversation.updatedAt,
     );
     return conversation;
   }
 
-  listAiConversations(limit = 30): AiConversation[] {
+  listAiConversations(): AiConversation[] {
     const rows = this.#db.prepare(
-      `SELECT id, provider, title, default_model, default_reasoning_effort,
-              provider_thread_id, created_at, updated_at
+      `SELECT id, assistant_slot, provider, title, default_model, default_reasoning_effort,
+              provider_thread_id, archived_at, created_at, updated_at
        FROM ai_conversations
-       ORDER BY updated_at DESC
+       WHERE archived_at IS NULL
+       ORDER BY assistant_slot ASC`,
+    ).all() as unknown as AiConversationRow[];
+    return rows.map(mapAiConversation);
+  }
+
+  listArchivedAiConversations(limit = 20): AiConversation[] {
+    const rows = this.#db.prepare(
+      `SELECT id, assistant_slot, provider, title, default_model, default_reasoning_effort,
+              provider_thread_id, archived_at, created_at, updated_at
+       FROM ai_conversations
+       WHERE archived_at IS NOT NULL
+       ORDER BY archived_at DESC
        LIMIT ?`,
     ).all(limit) as unknown as AiConversationRow[];
     return rows.map(mapAiConversation);
@@ -359,11 +386,45 @@ export class OpsStore {
 
   getAiConversation(id: string): AiConversation | null {
     const row = this.#db.prepare(
-      `SELECT id, provider, title, default_model, default_reasoning_effort,
-              provider_thread_id, created_at, updated_at
+      `SELECT id, assistant_slot, provider, title, default_model, default_reasoning_effort,
+              provider_thread_id, archived_at, created_at, updated_at
        FROM ai_conversations WHERE id = ?`,
     ).get(id) as unknown as AiConversationRow | undefined;
     return row ? mapAiConversation(row) : null;
+  }
+
+  getActiveAiConversation(id: string): AiConversation | null {
+    const conversation = this.getAiConversation(id);
+    return conversation?.archivedAt === null ? conversation : null;
+  }
+
+  resetAiConversation(id: string): AiConversation {
+    const conversation = this.getActiveAiConversation(id);
+    if (!conversation) throw new Error("AI assistant not found");
+    const activeJob = this.#db.prepare(
+      `SELECT id FROM ai_jobs
+       WHERE conversation_id = ? AND status IN ('queued', 'running') LIMIT 1`,
+    ).get(id);
+    if (activeJob) throw new Error("AI conversation already has an active request");
+
+    const timestamp = new Date().toISOString();
+    this.#db.exec("BEGIN IMMEDIATE");
+    try {
+      this.#db.prepare(
+        "UPDATE ai_conversations SET archived_at = ?, updated_at = ? WHERE id = ?",
+      ).run(timestamp, timestamp, id);
+      const replacement = this.createAiConversation({
+        assistantSlot: conversation.assistantSlot,
+        provider: conversation.provider,
+        model: conversation.defaultModel,
+        reasoningEffort: conversation.defaultReasoningEffort,
+      });
+      this.#db.exec("COMMIT");
+      return replacement;
+    } catch (error) {
+      this.#db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   listAiMessages(conversationId: string): AiMessage[] {
@@ -392,7 +453,7 @@ export class OpsStore {
       return { job: duplicate, userMessage, assistantMessage, duplicate: true };
     }
 
-    const conversation = this.getAiConversation(input.conversationId);
+    const conversation = this.getActiveAiConversation(input.conversationId);
     if (!conversation) {
       throw new Error("AI conversation not found");
     }
@@ -616,6 +677,16 @@ export class OpsStore {
     return row ? mapAiMessage(row) : null;
   }
 
+  #nextAvailableAiAssistantSlot(): 1 | 2 | null {
+    const rows = this.#db.prepare(
+      "SELECT assistant_slot FROM ai_conversations WHERE archived_at IS NULL",
+    ).all() as Array<{ assistant_slot: 1 | 2 }>;
+    const occupied = new Set(rows.map((row) => row.assistant_slot));
+    if (!occupied.has(1)) return 1;
+    if (!occupied.has(2)) return 2;
+    return null;
+  }
+
   #migrate(): void {
     this.#db.exec(`
       CREATE TABLE IF NOT EXISTS captures (
@@ -640,11 +711,13 @@ export class OpsStore {
 
       CREATE TABLE IF NOT EXISTS ai_conversations (
         id TEXT PRIMARY KEY,
+        assistant_slot INTEGER NOT NULL CHECK (assistant_slot IN (1, 2)),
         provider TEXT NOT NULL CHECK (provider IN ('codex', 'grok')),
         title TEXT NOT NULL,
         default_model TEXT NOT NULL,
         default_reasoning_effort TEXT NOT NULL,
         provider_thread_id TEXT,
+        archived_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -690,6 +763,38 @@ export class OpsStore {
       CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation
         ON ai_messages (conversation_id, created_at);
     `);
+
+    const conversationColumns = this.#db.prepare("PRAGMA table_info(ai_conversations)").all() as Array<{
+      name: string;
+    }>;
+    if (!conversationColumns.some((column) => column.name === "assistant_slot")) {
+      this.#db.exec("ALTER TABLE ai_conversations ADD COLUMN assistant_slot INTEGER");
+    }
+    if (!conversationColumns.some((column) => column.name === "archived_at")) {
+      this.#db.exec("ALTER TABLE ai_conversations ADD COLUMN archived_at TEXT");
+    }
+
+    const assigned = this.#db.prepare(
+      "SELECT COUNT(*) AS count FROM ai_conversations WHERE assistant_slot IS NOT NULL",
+    ).get() as { count: number };
+    if (assigned.count === 0) {
+      const recent = this.#db.prepare(
+        "SELECT id FROM ai_conversations ORDER BY updated_at DESC, rowid DESC LIMIT 2",
+      ).all() as Array<{ id: string }>;
+      recent.forEach((conversation, index) => {
+        this.#db.prepare("UPDATE ai_conversations SET assistant_slot = ? WHERE id = ?")
+          .run(index + 1, conversation.id);
+      });
+      this.#db.prepare(
+        `UPDATE ai_conversations
+         SET assistant_slot = 1, archived_at = COALESCE(archived_at, updated_at)
+         WHERE assistant_slot IS NULL`,
+      ).run();
+    }
+    this.#db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_conversations_active_slot
+        ON ai_conversations (assistant_slot) WHERE archived_at IS NULL;
+    `);
   }
 }
 
@@ -717,11 +822,13 @@ function mapTask(row: TaskRow): Task {
 function mapAiConversation(row: AiConversationRow): AiConversation {
   return {
     id: row.id,
+    assistantSlot: row.assistant_slot,
     provider: row.provider,
     title: row.title,
     defaultModel: row.default_model,
     defaultReasoningEffort: row.default_reasoning_effort,
     providerThreadId: row.provider_thread_id,
+    archivedAt: row.archived_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
