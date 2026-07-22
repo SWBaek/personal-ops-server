@@ -2,7 +2,7 @@
 
 ## Global rule
 
-This application must never call a model API directly. It invokes only official locally installed CLIs that already have subscription authentication under the Windows user running the service.
+This application must never call a model API directly. It invokes only official locally installed CLIs that already have subscription authentication under the Windows user running the service. AI is required for intelligent product operation, but provider access remains an adapter concern rather than product state.
 
 The background process must run as the same Windows user that owns the CLI login and OS keyring entries. Do not run it as `LocalSystem` and do not copy credentials into the service.
 
@@ -25,7 +25,7 @@ The prompt is written to stdin. The application parses JSONL and returns only th
 
 Durable text streaming starts `codex app-server --listen stdio://` as a private child process. The server performs the JSON-RPC initialize handshake, starts or resumes an internal thread, and sends turns with a fixed working directory, `read-only` sandbox, `never` approval policy, disabled network access, and allowlisted model/reasoning values. It forwards only `item/agentMessage/delta` text and terminal usage. It never opens a WebSocket listener or exposes provider thread IDs.
 
-Structured mutation interpretation will add an application-owned JSON Schema through `--output-schema`. The returned proposal is validated and applied by the server.
+The current Codex runner is read-only. The refounded assistant runtime will expose only application-owned domain tools or structured output schemas. A returned intent is untrusted until the server validates role authority, data scope, current-state preconditions, domain invariants, conflicts, and idempotency, then records a receipt for any committed change.
 
 Do not use `danger-full-access`. Do not expose Codex app-server or remote-control directly to remote devices.
 
@@ -56,3 +56,12 @@ The application incrementally parses assistant text and returns bounded usage co
 - Parse JSON incrementally and treat malformed output as a failed job.
 - Never return raw environment variables or diagnostic dumps to the browser.
 - Keep adapters replaceable because CLI flags and output formats may evolve.
+
+## Product-role boundary
+
+- Provider adapters expose capabilities such as streaming, structured output, resumable threads, and cancellation. They do not define the chief assistant or specialist roles.
+- Role instructions, context packages, domain tools, and authority policies are application-owned and provider-independent.
+- Provider conversations and session IDs are not canonical memory and must not be the only record of a fact, project state, decision, or commitment.
+- Web-triggered roles receive no broad shell or filesystem tool. If a CLI protocol requires a working directory, use the fixed isolated directory and expose only typed application operations.
+- A specialist invocation receives a bounded goal and context. It cannot select a wider provider toolset or grant itself additional permissions.
+- Scheduled or delegated work must use durable application jobs; a provider session is not a durability boundary.

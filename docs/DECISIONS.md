@@ -1,57 +1,113 @@
 # Decision Log
 
+Each decision is marked **Active**, **Superseded**, or **Transitional**. Superseded decisions remain here so later work does not mistake old implementation choices for unexplained drift.
+
 ## 2026-07-22 — Separate repository
 
-The application lives in an independent repository outside any legacy personal vault. This prevents vault-specific schemas, agent rules, and dirty worktree state from affecting application development.
+**Status: Active**
 
-## 2026-07-22 — Preserve, do not migrate, the legacy vault
+The application lives in an independent public repository outside the legacy personal vault. This isolates application code, runtime data, secrets, and release history from personal source material.
 
-Any existing legacy vault remains an independent read-only archive. No automatic indexing or migration is authorized. Future migration must name the exact source scope and target behavior.
+## 2026-07-22 — Preserve the legacy WorkOS source
+
+**Status: Active, clarified by the refoundation**
+
+The legacy vault is not implicitly part of this repository's authority. Future integration begins as an explicitly authorized read-only source bridge with provenance and a rebuildable index. Reading does not authorize migration, rewriting, deletion, or external transmission. Canonical ownership changes require a later reviewed decision.
 
 ## 2026-07-22 — No model APIs
 
-OpenAI, xAI, and other model APIs are prohibited. AI access uses only official subscription-authenticated Codex and Grok CLIs installed locally.
+**Status: Active**
+
+OpenAI, xAI, and other model APIs are prohibited. AI access uses official locally installed subscription-authenticated Codex and Grok CLIs. Provider behavior remains behind replaceable adapters, and credentials remain owned by the CLI and operating system.
 
 ## 2026-07-22 — AI is optional
 
-Capture, Today, complete, defer, search, export, and restore must work without AI. Provider outages and usage limits must not block the personal operations service.
+**Status: Superseded**
+
+The initial product required Capture, Today, complete, defer, search, export, and restore to work without AI. This produced a task application with AI attached rather than a professional-assistant system.
+
+The replacement decision is “AI operates the product” below. Deterministic storage, validation, backup, and recovery remain mandatory, but they support the AI operator rather than define an AI-free user experience.
+
+## 2026-07-22 — AI operates the personal executive office
+
+**Status: Active**
+
+WorkOS is an AI-dependent personal executive office. The owner provides natural-language direction, evidence, values, corrections, and consequential approval. A chief assistant interprets requests, assembles context, delegates specialists, and manages the shared operational world through typed application tools.
+
+If a supported AI provider is unavailable, intelligent work stops, queues, or reports a blocked state. The system preserves coherent state and never fabricates completion.
+
+## 2026-07-22 — One chief assistant with specialist roles
+
+**Status: Active**
+
+The normal user experience has one chief-assistant front door. The first internal specialist roles are project manager and knowledge researcher. The owner may address a role directly, but should not have to route ordinary work manually.
+
+A role exists only when it needs distinct expertise, context, tools, evaluation, or authority. Roles are not chat tabs, personalities, provider choices, or independent databases.
+
+## 2026-07-22 — One shared evidence-backed operational world
+
+**Status: Active**
+
+All roles share application-owned canonical state. Raw evidence, operational state, reusable knowledge, bounded agent memory, and audit state remain distinct. Conversation history and provider memory are not systems of record.
+
+Start with SQLite relation tables, explicit source references, and full-text search. Embeddings, graph traversal, or another storage engine must demonstrate value as derived capabilities before adoption.
 
 ## 2026-07-22 — Structured intent for mutations
 
-AI proposes schema-constrained domain operations. The server validates and applies them. The browser does not receive a shell, and models do not receive direct database ownership.
+**Status: Active, expanded**
+
+Agents return schema-constrained domain operations. The application validates authority, current-state preconditions, invariants, idempotency, and conflicts before applying a transaction.
+
+Every committed agent mutation produces a receipt and bounded undo path. Destructive, bulk, external, financial, migration, and policy-changing work uses a separate proposal and approval phase. Models never write SQLite or canonical files directly.
 
 ## 2026-07-22 — Private remote access
 
-Remote devices connect through Tailscale Serve. Public port forwarding and public tunnels are excluded.
+**Status: Active**
+
+Remote devices connect through Tailscale Serve while Fastify remains bound to localhost. Public port forwarding, public reverse proxies, and Tailscale Funnel are excluded. The current tailnet contains only the owner.
+
+Temporary development access may rely on the owner-only tailnet. Application authentication remains required before consequential integrations, external communication, or wider access.
 
 ## 2026-07-22 — Start with a small stack
 
-The first implementation uses Node.js 24+, TypeScript, Fastify, Node's built-in SQLite, and a plain browser UI. Framework expansion requires a demonstrated product need.
+**Status: Active**
 
-## 2026-07-22 — Start AI with isolated single-turn CLI chat
+The implementation uses Node.js 24+, TypeScript, Fastify, Node's built-in SQLite, and a dependency-light browser UI. The refoundation adds domain concepts and role orchestration without adopting a generic agent framework by default.
 
-The first live AI feature is synchronous, read-only, and single-turn. The browser may select only allowlisted providers, models, and reasoning levels. The server runs the installed Codex or Grok CLI in a fixed empty working directory with time, output, and provider-concurrency limits, then returns only the final answer and bounded usage counts.
+Framework, graph database, vector database, and UI stack expansion require a demonstrated workflow or measured failure of the current stack.
 
-The official Codex SDK is a useful future option for streaming and resumable Codex threads, but it is not adopted in this milestone. Keeping the provider adapter at the official installed CLI boundary preserves the current CLI-only constraint and a common architecture for Codex and Grok.
+## 2026-07-22 — Use official CLI adapters, not Codex SDK
 
-A follow-up review confirmed that the TypeScript SDK wraps the Codex CLI and exchanges the same JSONL event stream that the current adapter already parses. Migrating now would not materially improve the single-turn workflow and would introduce a second Codex CLI version boundary through the SDK dependency. Reconsider the SDK when persistent Codex threads, structured streaming, per-turn schemas, or image inputs become an accepted milestone.
+**Status: Active**
 
-Temporary unauthenticated access is limited to the owner's private tailnet for active development inspection. The tailnet currently has no other members and all connected devices belong to the owner. Application authentication remains required before wider use, persistent AI conversations, or AI-proposed mutations.
+The Codex TypeScript SDK wraps the Codex CLI and its event stream but does not materially improve the accepted CLI-only boundary today. The current adapter uses private app-server stdio for streaming with `codex exec --json` fallback.
 
-## 2026-07-22 — Use project-native Playwright for visual verification
+Reconsider the SDK only if it provides an accepted capability that cannot be cleanly supported behind the existing adapter, such as a stable application-tool loop or structured turn schema, without weakening the no-model-API constraint.
 
-CLI development uses Playwright with an isolated Chromium runtime for repeatable layout checks and screenshots. Tests start a temporary localhost server on a dedicated port with separate SQLite and AI working directories. All screenshots, traces, reports, and test data stay under ignored artifact paths. This does not provide access to the owner's normal Chrome profile or signed-in browser sessions.
+## 2026-07-22 — Use project-native Playwright
 
-## 2026-07-22 — Persist read-only AI conversations and stream sanitized events
+**Status: Active**
 
-AI conversations, messages, and job state are canonical SQLite data. A conversation is fixed to one provider while model and reasoning effort may change per turn. Requests use a unique client request ID, one active job is allowed per provider, and jobs follow explicit queued, running, and terminal states. Running jobs become interrupted after a server restart rather than being retried automatically.
+CLI development uses Playwright with an isolated Chromium runtime for repeatable layout and workflow checks. Tests use isolated data and keep screenshots, traces, reports, and test databases in ignored paths. Playwright does not access the owner's normal browser profile.
 
-The project does not adopt any model SDK because repository policy permits only installed subscription-authenticated CLIs. Codex text streaming uses the official CLI's app-server over a child-process stdio transport; it never opens an app-server network listener or exposes raw JSON-RPC to the browser. If this version-sensitive integration cannot initialize, the adapter falls back to the stable buffered `codex exec --json` path. Grok uses its official streaming JSON and resumable session flags.
+## 2026-07-22 — Persist AI conversations and durable jobs
 
-Only assistant text deltas, sanitized state, final usage, and bounded errors cross the SSE boundary. Reasoning, tool output, provider session identifiers, raw stderr, credentials, and CLI diagnostics remain server-side. Temporary unauthenticated use remains restricted to the owner's single-member tailnet; authentication and AI-proposed mutations remain separate later milestones.
+**Status: Active foundation**
 
-## 2026-07-22 — Prefer one or two durable assistants over unlimited active chats
+Conversations, messages, and jobs are stored in SQLite. Requests use unique client IDs, provider concurrency controls, explicit job states, cancellation, bounded output, and restart reconciliation. Only sanitized assistant text and state cross the SSE boundary.
 
-The product presents at most two active assistant slots: a primary assistant and an optional secondary assistant. This matches the personal-operations goal better than an unbounded consumer-chat history. Each slot has one active context and a fixed provider; model and reasoning effort remain compact per-turn choices.
+The refoundation will retain this infrastructure while adding role invocation, context packages, proposals, approvals, receipts, and scheduled goals.
 
-Resetting context archives the current conversation and creates a fresh provider thread in the same slot. Archived messages remain durable and available through the deliberately secondary “이전 문맥” view. Existing databases migrate without deleting conversations: the two most recently updated conversations become active slots and older conversations become archived primary-assistant contexts.
+## 2026-07-22 — One or two durable assistant slots
+
+**Status: Superseded**
+
+The compact two-slot UI was preferable to unlimited consumer-chat history for the initial prototype, but it still modeled assistants as conversation containers. The target UI uses one chief-assistant conversation with specialist activity and object context behind it. Existing conversation archives remain data and may be migrated or retained as historical threads.
+
+## 2026-07-22 — Borrow patterns from Hermes, Letta, and CoWork OS without adopting them
+
+**Status: Active**
+
+Useful reference patterns include a shared core across interaction surfaces, bounded curated memory, skills as procedural context, durable scheduling, isolated delegation, checkpoints, shared memory, evidence-aware state, and governed tools.
+
+The project will not adopt an external runtime wholesale because the product needs a WorkOS-specific operational ledger, official CLI-only inference, narrow domain tools, and stricter control over personal evidence. Generic host-terminal access, API-provider assumptions, per-profile data silos, and early self-modifying skills conflict with current boundaries.

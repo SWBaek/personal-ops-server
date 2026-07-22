@@ -2,60 +2,81 @@
 
 Updated: 2026-07-22
 
-## Ready
+## Product status
 
-- Independent repository scaffold outside the legacy personal vault.
-- Durable project and security context.
-- Local Fastify server.
+The product direction has been reset.
+
+The repository was initially implemented as a small personal task service with optional AI chat. That concept is now superseded. The target is an AI-dependent personal executive office with one chief-assistant front door, specialist roles, a shared evidence-backed operational ledger, typed mutations, receipts, and proactive follow-up.
+
+The running application is therefore a useful technical prototype, not a valid representation of the target product experience.
+
+## Reusable foundation already working
+
+- Independent public repository outside the legacy personal vault.
+- Local Fastify server bound to localhost.
 - SQLite initialization using Node's built-in `node:sqlite`.
-- Capture creation and listing.
-- Task creation, Today/open listing, completion, and rescheduling.
-- Minimal browser UI for the core workflow.
-- Safe, non-AI CLI availability checks.
-- Durable, read-only Codex and Grok conversations through installed subscription-authenticated CLIs.
-- One primary and one optional secondary assistant with durable context reset archives.
-- Allowlisted provider, model, and reasoning controls in the browser.
-- SQLite-backed conversations, messages, idempotent AI jobs, sanitized SSE, cancellation, and restart recovery.
+- Capture and Task primitives that can inform, but do not define, the future domain model.
+- Private remote access through Tailscale Serve.
+- Durable Codex and Grok conversations through official locally installed subscription-authenticated CLIs.
+- Allowlisted provider, model, and reasoning controls.
+- SQLite-backed conversations, messages, idempotent jobs, sanitized SSE, cancellation, and restart recovery.
 - Codex app-server text deltas over private stdio with buffered `codex exec` fallback; Grok streaming JSON.
 - Fixed empty AI working directory, provider concurrency locks, two-minute timeout, and bounded output.
-- Isolated Playwright Chromium checks for responsive layout, compact assistant switching, context archives, AI streaming, and reload recovery.
-- Type checks, tests, and production build scripts.
+- Playwright Chromium coverage for responsive layout, conversation switching, archives, streaming, and reload recovery.
+- Type checking, unit/integration tests, production build, and verification scripts.
+
+## Transitional or superseded product behavior
+
+- Capture and Today currently dominate the main view.
+- AI is read-only and cannot retrieve or operate on real project or knowledge context.
+- The primary/secondary assistant slots model assistants as conversation containers rather than roles over shared state.
+- Projects, people, meetings, decisions, dependencies, risks, knowledge artifacts, evidence provenance, receipts, and corrections do not exist in the application domain.
+- Current project documentation previously required useful operation without AI; that requirement is superseded.
+- The legacy WorkOS vault remains disconnected.
+
+Do not expand these transitional behaviors as if they were the target architecture.
 
 ## Deliberately not implemented
 
-- Application authentication.
-- structured-intent mutation parsing;
-- AI approval and structured-intent mutation parsing;
-- search, projects, notes, attachments, and export;
-- database backup and restore automation;
-- Legacy vault migration.
+- chief-assistant orchestration;
+- specialist role execution;
+- goal-specific context building;
+- typed agent domain tools;
+- shared operational ledger beyond primitive tasks;
+- evidence ingestion and provenance;
+- project, meeting, person, decision, dependency, risk, and knowledge models;
+- legacy WorkOS read-only bridge;
+- proposal, approval, receipt, correction, and undo workflows;
+- durable scheduled assistant goals;
+- application authentication;
+- coordinated database/evidence backup, export, and restore.
 
-These are omitted to keep the first trust boundary small.
+## Verification baseline
 
-## Verification evidence
+The last implementation verification on Windows with Node.js 24.18.0 passed on 2026-07-22:
 
-Verified on Windows with Node.js 24.18.0 on 2026-07-22:
+- `npm run verify`;
+- 26 unit/integration tests and 7 Playwright tests;
+- TypeScript production build;
+- `npm audit --audit-level=moderate` with zero reported vulnerabilities;
+- local health endpoint and tailnet-served page;
+- live streaming requests from Codex and Grok.
 
-- `npm run verify` passed;
-- 26 unit/integration tests and 7 Playwright browser tests passed with no failures;
-- TypeScript production build completed;
-- `npm audit --audit-level=moderate` reported zero vulnerabilities;
-- the built server answered `/api/health` successfully on `127.0.0.1:4310`;
-- provider checks detected `codex-cli 0.144.6` and official Grok Build `0.2.106`;
-- live durable streaming requests returned expected answers from both Codex and Grok;
-- the Grok request was also verified through the tailnet-only Tailscale Serve URL.
+This evidence validates the current infrastructure only. It does not validate the refounded assistant workflows.
+
+## Current documentation milestone
+
+The product constitution, architecture, security model, decision log, and refoundation plan now describe the new direction. No application code or legacy WorkOS data has been changed as part of this documentation milestone.
 
 ## Recommended next milestone
 
-Implement durable non-AI search next, while keeping AI mutation disabled:
+Build a read-only WorkOS context bridge and a chief-assistant question workflow:
 
-1. add deterministic search across captures and tasks;
-2. add documented JSON/Markdown export and SQLite backup;
-3. add application authentication before access expands beyond the owner's current tailnet;
-4. keep structured AI mutation interpretation and approval as a separate later milestone.
+1. obtain or confirm exact authorization for the legacy source scope;
+2. parse supported project, meeting, knowledge, action, and link structures without modifying the source;
+3. create a rebuildable local index with provenance;
+4. let the chief assistant answer a bounded project or operational question using cited source context;
+5. verify representative answers against known WorkOS records;
+6. keep all domain mutation disabled until the shared ledger and receipt contract are accepted.
 
-## First Codex prompt
-
-```text
-Read AGENTS.md and docs/PROJECT_BRIEF.md, ARCHITECTURE.md, SECURITY.md, CLI_CONTRACTS.md, and CURRENT_STATE.md. Inspect the existing scaffold and run npm run verify. Do not access any legacy personal vault and do not use any model API. Propose the smallest next milestone for a read-only CLI job runner, including tests and security boundaries, before editing.
-```
+See `docs/ASSISTANT_SYSTEM_REFOUNDATION.md` for the staged plan and acceptance criteria.
