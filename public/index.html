@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Personal Ops</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <div class="primary-column">
+      <header>
+        <p class="eyebrow">LOCAL PERSONAL OPERATIONS</p>
+        <h1>지금 필요한 것만</h1>
+        <p class="lede">수집하고, 오늘 할 일을 보고, 완료하거나 미룹니다.</p>
+      </header>
+
+      <section class="card capture-card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">CAPTURE</p>
+            <h2>무엇이든 잡아두기</h2>
+          </div>
+          <span id="capture-status" class="status" aria-live="polite"></span>
+        </div>
+        <form id="capture-form">
+          <textarea
+            id="capture-body"
+            name="body"
+            rows="3"
+            maxlength="2000"
+            placeholder="생각, 메일 조각, 기억할 것…"
+            required
+          ></textarea>
+          <button type="submit">잡아두기</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">TODAY</p>
+            <h2>오늘 할 일</h2>
+          </div>
+          <button id="refresh" class="quiet" type="button">새로고침</button>
+        </div>
+        <div id="today-list" class="task-list" aria-live="polite"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">NEW TASK</p>
+            <h2>행동 추가</h2>
+          </div>
+        </div>
+        <form id="task-form" class="task-form">
+          <label>
+            행동
+            <input id="task-title" name="title" maxlength="500" required />
+          </label>
+          <label>
+            다시 볼 날
+            <input id="task-scheduled" name="scheduledOn" type="date" />
+          </label>
+          <label>
+            실제 마감
+            <input id="task-due" name="dueOn" type="date" />
+          </label>
+          <button type="submit">추가</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">OPEN</p>
+            <h2>열린 행동</h2>
+          </div>
+        </div>
+        <div id="open-list" class="task-list" aria-live="polite"></div>
+      </section>
+
+      <section class="card provider-card">
+        <div>
+          <p class="eyebrow">AI CLI</p>
+          <h2>로컬 도구 상태</h2>
+          <p>공식 CLI의 설치 상태입니다. AI 요청은 읽기 전용으로 실행됩니다.</p>
+        </div>
+        <div id="provider-list" class="provider-list"></div>
+      </section>
+      </div>
+
+      <aside class="ai-panel" aria-label="AI 채팅">
+        <section class="card ai-card">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">AI CHAT</p>
+              <h2>AI에게 물어보기</h2>
+            </div>
+            <span id="ai-status" class="status" aria-live="polite"></span>
+          </div>
+          <form id="ai-form" class="ai-form">
+            <div class="ai-controls">
+              <label>
+                제공자
+                <select id="ai-provider" name="provider"></select>
+              </label>
+              <label>
+                모델
+                <select id="ai-model" name="model"></select>
+              </label>
+              <label>
+                추론 수준
+                <select id="ai-reasoning" name="reasoningEffort"></select>
+              </label>
+            </div>
+            <label>
+              메시지
+              <textarea
+                id="ai-message"
+                name="message"
+                rows="5"
+                maxlength="8000"
+                placeholder="궁금한 내용을 입력하세요"
+                required
+              ></textarea>
+            </label>
+            <button id="ai-submit" type="submit">보내기</button>
+          </form>
+          <div id="ai-transcript" class="ai-transcript" aria-live="polite">
+            <p class="empty">각 메시지는 독립적인 읽기 전용 요청으로 실행됩니다.</p>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <template id="task-template">
+      <article class="task-item">
+        <div class="task-copy">
+          <strong class="task-title"></strong>
+          <span class="task-meta"></span>
+        </div>
+        <div class="task-actions">
+          <input class="defer-date" type="date" aria-label="다시 볼 날짜" />
+          <button class="defer quiet" type="button">미루기</button>
+          <button class="complete" type="button">완료</button>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
