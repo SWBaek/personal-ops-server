@@ -168,20 +168,19 @@ All assistant turns and scheduled operations use durable jobs with:
 
 Scheduled jobs trigger an assistant goal with a fresh bounded context package. They do not depend on an open browser or an indefinitely growing chat history.
 
-## Legacy WorkOS bridge
+## Source adapters and optional historical import
 
-The legacy vault is a source system and benchmark corpus, not an implicitly mounted workspace.
+The application owns a source-neutral evidence contract. Normal operation begins with native capture and application-managed records and never requires a legacy vault, synchronized folder, or external source system.
 
-The first authorized integration should be read-only and explicit:
+Source adapters may later ingest explicitly authorized historical or external material. An adapter:
 
-1. inventory supported source types;
-2. parse projects, meetings, knowledge, links, actions, and relevant metadata;
-3. retain source paths or stable source references internally without exposing machine paths to the browser;
-4. build a replaceable derived index;
-5. answer questions with source citations;
-6. compare extracted state against representative expected results.
+1. maps source-specific records into application-owned evidence and import candidates;
+2. keeps source format and location details outside the canonical domain model;
+3. records provenance, content hashes, diagnostics, and source identity;
+4. builds a replaceable derived import index;
+5. remains removable without disabling native operation or invalidating already accepted canonical records.
 
-No migration, deletion, rewrite, or external transmission follows from read authorization. Canonical ownership moves only through a later reviewed migration decision.
+A legacy WorkOS adapter is one optional implementation of this interface. It is not the default repository, benchmark requirement, runtime mount, or source of domain rules. Its first authorized mode must be read-only. No migration, deletion, rewrite, or external transmission follows from read authorization, and canonical ownership moves only through a later reviewed import decision.
 
 ## Remote access
 

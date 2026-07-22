@@ -32,7 +32,7 @@ The running application is therefore a useful technical prototype, not a valid r
 - The primary/secondary assistant slots model assistants as conversation containers rather than roles over shared state.
 - Projects, people, meetings, decisions, dependencies, risks, knowledge artifacts, evidence provenance, receipts, and corrections do not exist in the application domain.
 - Current project documentation previously required useful operation without AI; that requirement is superseded.
-- The legacy WorkOS vault remains disconnected.
+- No legacy WorkOS vault is required or connected. This is the intended default, not a missing runtime dependency.
 
 Do not expand these transitional behaviors as if they were the target architecture.
 
@@ -45,7 +45,7 @@ Do not expand these transitional behaviors as if they were the target architectu
 - shared operational ledger beyond primitive tasks;
 - evidence ingestion and provenance;
 - project, meeting, person, decision, dependency, risk, and knowledge models;
-- legacy WorkOS read-only bridge;
+- optional historical-source adapters, including a possible WorkOS importer;
 - proposal, approval, receipt, correction, and undo workflows;
 - durable scheduled assistant goals;
 - application authentication;
@@ -70,13 +70,14 @@ The product constitution, architecture, security model, decision log, and refoun
 
 ## Recommended next milestone
 
-Build a read-only WorkOS context bridge and a chief-assistant question workflow:
+Build an application-native evidence/context foundation and one grounded chief-assistant question workflow:
 
-1. obtain or confirm exact authorization for the legacy source scope;
-2. parse supported project, meeting, knowledge, action, and link structures without modifying the source;
-3. create a rebuildable local index with provenance;
-4. let the chief assistant answer a bounded project or operational question using cited source context;
-5. verify representative answers against known WorkOS records;
-6. keep all domain mutation disabled until the shared ledger and receipt contract are accepted.
+1. define source-neutral evidence, excerpt, provenance, and subject contracts;
+2. add versioned SQLite migrations and a rebuildable full-text read index;
+3. ingest native captures or synthetic development documents through an application-owned source interface;
+4. build a bounded context package for one explicit project or topic;
+5. let the chief assistant answer with browser-safe citations to that context;
+6. verify the workflow using synthetic fixtures that require no personal or legacy data;
+7. keep domain mutation and optional historical import disabled until the native contracts are accepted.
 
 See `docs/ASSISTANT_SYSTEM_REFOUNDATION.md` for the staged plan and acceptance criteria.

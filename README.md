@@ -22,7 +22,7 @@ Not yet implemented:
 
 - chief-assistant orchestration and specialist roles;
 - shared project, meeting, decision, people, risk, evidence, and knowledge models;
-- a read-only bridge to the legacy WorkOS source;
+- optional historical-data import adapters, including a possible read-only WorkOS adapter;
 - typed agent mutations, receipts, corrections, and undo;
 - proactive scheduled assistant work.
 

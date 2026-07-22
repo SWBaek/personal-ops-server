@@ -2,7 +2,7 @@
 
 ## Security objective
 
-WorkOS gives AI enough context and bounded authority to act as a professional assistant without giving a model ownership of the host computer, credentials, or canonical data.
+Personal Ops Server gives AI enough context and bounded authority to act as a professional assistant without giving a model ownership of the host computer, credentials, or canonical data.
 
 AI is required for the product's intelligent operation, but it remains an untrusted decision component inside an application-owned security and transaction boundary.
 
@@ -25,7 +25,7 @@ AI is required for the product's intelligent operation, but it remains an untrus
 5. Specialist agents do not inherit authority merely because the chief assistant delegated a task.
 6. CLI stdout, stderr, session identifiers, and protocol events are provider-controlled input.
 7. Subscription credentials, browser sessions, OS keyrings, and credential files are never application data.
-8. The legacy WorkOS vault is outside standing project authority and must be separately scoped.
+8. The optional legacy WorkOS reference is outside standing project authority and must be separately scoped; the product never requires access to it.
 
 ## Authority model
 
