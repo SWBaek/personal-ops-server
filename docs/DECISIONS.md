@@ -49,3 +49,9 @@ AI conversations, messages, and job state are canonical SQLite data. A conversat
 The project does not adopt any model SDK because repository policy permits only installed subscription-authenticated CLIs. Codex text streaming uses the official CLI's app-server over a child-process stdio transport; it never opens an app-server network listener or exposes raw JSON-RPC to the browser. If this version-sensitive integration cannot initialize, the adapter falls back to the stable buffered `codex exec --json` path. Grok uses its official streaming JSON and resumable session flags.
 
 Only assistant text deltas, sanitized state, final usage, and bounded errors cross the SSE boundary. Reasoning, tool output, provider session identifiers, raw stderr, credentials, and CLI diagnostics remain server-side. Temporary unauthenticated use remains restricted to the owner's single-member tailnet; authentication and AI-proposed mutations remain separate later milestones.
+
+## 2026-07-22 — Prefer one or two durable assistants over unlimited active chats
+
+The product presents at most two active assistant slots: a primary assistant and an optional secondary assistant. This matches the personal-operations goal better than an unbounded consumer-chat history. Each slot has one active context and a fixed provider; model and reasoning effort remain compact per-turn choices.
+
+Resetting context archives the current conversation and creates a fresh provider thread in the same slot. Archived messages remain durable and available through the deliberately secondary “이전 문맥” view. Existing databases migrate without deleting conversations: the two most recently updated conversations become active slots and older conversations become archived primary-assistant contexts.

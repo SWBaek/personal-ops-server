@@ -104,6 +104,40 @@ test("AI conversations persist ordered messages and idempotent jobs", () => {
   }
 });
 
+test("AI assistants are limited to two active slots and reset without deleting history", () => {
+  const store = new OpsStore(":memory:");
+  try {
+    const primary = store.createAiConversation({
+      assistantSlot: 1,
+      provider: "codex",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    const secondary = store.createAiConversation({
+      assistantSlot: 2,
+      provider: "grok",
+      model: "default",
+      reasoningEffort: "default",
+    });
+
+    assert.deepEqual(store.listAiConversations().map((item) => item.id), [primary.id, secondary.id]);
+    assert.throws(() => store.createAiConversation({
+      provider: "codex",
+      model: "default",
+      reasoningEffort: "default",
+    }), /limit reached/);
+
+    const replacement = store.resetAiConversation(primary.id);
+    assert.equal(replacement.assistantSlot, 1);
+    assert.notEqual(replacement.id, primary.id);
+    assert.equal(store.getActiveAiConversation(primary.id), null);
+    assert.equal(store.getAiConversation(primary.id)?.archivedAt === null, false);
+    assert.deepEqual(store.listArchivedAiConversations().map((item) => item.id), [primary.id]);
+  } finally {
+    store.close();
+  }
+});
+
 test("AI jobs follow durable terminal transitions", () => {
   const store = new OpsStore(":memory:");
   try {

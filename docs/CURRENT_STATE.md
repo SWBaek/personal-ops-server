@@ -13,11 +13,12 @@ Updated: 2026-07-22
 - Minimal browser UI for the core workflow.
 - Safe, non-AI CLI availability checks.
 - Durable, read-only Codex and Grok conversations through installed subscription-authenticated CLIs.
+- One primary and one optional secondary assistant with durable context reset archives.
 - Allowlisted provider, model, and reasoning controls in the browser.
 - SQLite-backed conversations, messages, idempotent AI jobs, sanitized SSE, cancellation, and restart recovery.
 - Codex app-server text deltas over private stdio with buffered `codex exec` fallback; Grok streaming JSON.
 - Fixed empty AI working directory, provider concurrency locks, two-minute timeout, and bounded output.
-- Isolated Playwright Chromium checks for responsive layout, screenshots, core interactions, AI streaming, and reload recovery.
+- Isolated Playwright Chromium checks for responsive layout, compact assistant switching, context archives, AI streaming, and reload recovery.
 - Type checks, tests, and production build scripts.
 
 ## Deliberately not implemented
@@ -36,7 +37,7 @@ These are omitted to keep the first trust boundary small.
 Verified on Windows with Node.js 24.18.0 on 2026-07-22:
 
 - `npm run verify` passed;
-- 25 unit/integration tests and 5 Playwright browser tests passed with no failures;
+- 26 unit/integration tests and 7 Playwright browser tests passed with no failures;
 - TypeScript production build completed;
 - `npm audit --audit-level=moderate` reported zero vulnerabilities;
 - the built server answered `/api/health` successfully on `127.0.0.1:4310`;

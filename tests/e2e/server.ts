@@ -1,12 +1,10 @@
-import { join } from "node:path";
-
 import { AiConversationService, type AiStreamingProvider } from "../../src/ai/streaming-service.js";
 import { buildApp } from "../../src/app.js";
 import { loadConfig } from "../../src/config.js";
 import { OpsStore } from "../../src/infra/store.js";
 
 const config = loadConfig();
-const store = new OpsStore(join(config.dataDir, "personal-ops.db"));
+const store = new OpsStore(":memory:");
 const provider: AiStreamingProvider = {
   async runTurn(input) {
     input.onDelta("스트리밍 ");

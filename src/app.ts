@@ -33,6 +33,7 @@ interface UpdateTaskBody {
 }
 
 interface CreateAiConversationBody {
+  assistantSlot?: unknown;
   provider?: unknown;
   model?: unknown;
   reasoningEffort?: unknown;
@@ -136,12 +137,25 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.get("/api/ai/conversations", async () => ({
     conversations: options.store.listAiConversations().map(publicConversation),
+    archivedConversations: options.store.listArchivedAiConversations().map(publicConversation),
   }));
 
   app.post<{ Body: CreateAiConversationBody }>("/api/ai/conversations", async (request, reply) => {
     requireAiConversationService(options.aiConversationService);
     const selection = validateAiSelection(request.body);
-    const conversation = options.store.createAiConversation(selection);
+    const assistantSlot = optionalAssistantSlot(request.body?.assistantSlot);
+    let conversation;
+    try {
+      conversation = options.store.createAiConversation({
+        ...selection,
+        ...(assistantSlot ? { assistantSlot } : {}),
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("assistant")) {
+        throw new AiChatError("활성 비서는 최대 두 명까지 사용할 수 있습니다.", 409);
+      }
+      throw error;
+    }
     return reply.code(201).send({ conversation: publicConversation(conversation) });
   });
 
@@ -154,11 +168,30 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     };
   });
 
+  app.post<{ Params: { id: string } }>(
+    "/api/ai/conversations/:id/reset",
+    async (request, reply) => {
+      requireAiConversationService(options.aiConversationService);
+      try {
+        const conversation = options.store.resetAiConversation(request.params.id);
+        return reply.code(201).send({ conversation: publicConversation(conversation) });
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("active request")) {
+          throw new AiChatError("진행 중인 응답을 취소한 뒤 맥락을 초기화하세요.", 409);
+        }
+        if (error instanceof Error && error.message.includes("not found")) {
+          return reply.code(404).send({ error: "활성 비서를 찾을 수 없습니다." });
+        }
+        throw error;
+      }
+    },
+  );
+
   app.post<{ Params: { id: string }; Body: CreateAiMessageBody }>(
     "/api/ai/conversations/:id/messages",
     async (request, reply) => {
       const service = requireAiConversationService(options.aiConversationService);
-      const conversation = options.store.getAiConversation(request.params.id);
+      const conversation = options.store.getActiveAiConversation(request.params.id);
       if (!conversation) return reply.code(404).send({ error: "AI 대화를 찾을 수 없습니다." });
       const selection = validateAiSelection({
         provider: conversation.provider,
@@ -285,6 +318,12 @@ function validateAiSelection(body: CreateAiConversationBody | undefined): {
 function requireAiConversationService(service: AiConversationService | undefined): AiConversationService {
   if (!service) throw new AiChatError("AI conversations are not configured", 503);
   return service;
+}
+
+function optionalAssistantSlot(value: unknown): 1 | 2 | undefined {
+  if (value === undefined) return undefined;
+  if (value !== 1 && value !== 2) throw new InputError("assistantSlot must be 1 or 2");
+  return value;
 }
 
 function requireUuid(value: unknown, field: string): string {

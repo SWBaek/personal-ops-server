@@ -7,8 +7,16 @@ const openList = document.querySelector("#open-list");
 const providerList = document.querySelector("#provider-list");
 const taskTemplate = document.querySelector("#task-template");
 const aiForm = document.querySelector("#ai-form");
-const aiConversation = document.querySelector("#ai-conversation");
-const aiNewConversation = document.querySelector("#ai-new-conversation");
+const aiAssistantSwitcher = document.querySelector("#ai-assistant-switcher");
+const aiAssistantName = document.querySelector("#ai-assistant-name");
+const aiContextTitle = document.querySelector("#ai-context-title");
+const aiProviderBadge = document.querySelector("#ai-provider-badge");
+const aiProviderControl = document.querySelector("#ai-provider-control");
+const aiResetContext = document.querySelector("#ai-reset-context");
+const aiReturnCurrent = document.querySelector("#ai-return-current");
+const aiHistory = document.querySelector("#ai-history");
+const aiHistoryCount = document.querySelector("#ai-history-count");
+const aiHistoryList = document.querySelector("#ai-history-list");
 const aiProvider = document.querySelector("#ai-provider");
 const aiModel = document.querySelector("#ai-model");
 const aiReasoning = document.querySelector("#ai-reasoning");
@@ -20,7 +28,10 @@ const aiTranscript = document.querySelector("#ai-transcript");
 
 let aiProviderOptions = [];
 let aiConversations = [];
+let aiArchivedConversations = [];
+let currentAssistantSlot = 1;
 let currentConversationId = "";
+let viewingArchived = false;
 let activeJobId = "";
 let activeEventSource = null;
 
@@ -56,16 +67,42 @@ taskForm.addEventListener("submit", async (event) => {
 
 document.querySelector("#refresh").addEventListener("click", refreshAll);
 aiProvider.addEventListener("change", refreshAiControls);
-aiConversation.addEventListener("change", async () => {
-  currentConversationId = aiConversation.value;
-  if (currentConversationId) await loadConversation(currentConversationId);
-  else resetConversationComposer();
+aiAssistantSwitcher.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-slot]");
+  if (!button || activeJobId) return;
+  currentAssistantSlot = Number(button.dataset.slot);
+  viewingArchived = false;
+  await showCurrentAssistant();
 });
-aiNewConversation.addEventListener("click", () => {
-  aiConversation.value = "";
-  currentConversationId = "";
-  resetConversationComposer();
-  aiMessage.focus();
+aiResetContext.addEventListener("click", async () => {
+  if (!currentConversationId || activeJobId) return;
+  if (!window.confirm("현재 문맥을 초기화할까요? 지금까지의 기록은 이전 문맥에 보존됩니다.")) return;
+  aiResetContext.disabled = true;
+  aiStatus.textContent = "문맥 초기화 중…";
+  try {
+    const reset = await request(
+      `/api/ai/conversations/${encodeURIComponent(currentConversationId)}/reset`,
+      { method: "POST" },
+    );
+    currentConversationId = reset.conversation.id;
+    await refreshAiConversations(currentConversationId, true);
+    aiStatus.textContent = "새 문맥";
+  } catch (error) {
+    aiStatus.textContent = error.message;
+  } finally {
+    aiResetContext.disabled = false;
+  }
+});
+aiReturnCurrent.addEventListener("click", async () => {
+  viewingArchived = false;
+  await showCurrentAssistant();
+});
+aiHistoryList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-conversation-id]");
+  if (!button || activeJobId) return;
+  viewingArchived = true;
+  await loadConversation(button.dataset.conversationId, true);
+  aiHistory.open = false;
 });
 aiCancel.addEventListener("click", async () => {
   if (!activeJobId) return;
@@ -91,6 +128,7 @@ aiForm.addEventListener("submit", async (event) => {
       const created = await request("/api/ai/conversations", {
         method: "POST",
         body: JSON.stringify({
+          assistantSlot: currentAssistantSlot,
           provider: aiProvider.value,
           model: aiModel.value,
           reasoningEffort: aiReasoning.value,
@@ -169,31 +207,44 @@ async function refreshAiOptions() {
 async function refreshAiConversations(preferredId = "", loadSelected = true) {
   const data = await request("/api/ai/conversations");
   aiConversations = data.conversations;
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "새 대화";
-  const options = data.conversations.map((conversation) => {
-    const option = document.createElement("option");
-    option.value = conversation.id;
-    option.textContent = `${conversation.title} · ${conversation.provider}`;
-    return option;
-  });
-  aiConversation.replaceChildren(placeholder, ...options);
-  const selected = data.conversations.find((conversation) => conversation.id === preferredId)
-    ?? (!preferredId ? data.conversations[0] : null);
-  currentConversationId = selected?.id ?? "";
-  aiConversation.value = currentConversationId;
-  if (loadSelected) {
-    if (selected) await loadConversation(selected.id);
-    else resetConversationComposer();
+  aiArchivedConversations = data.archivedConversations ?? [];
+  const preferred = aiConversations.find((conversation) => conversation.id === preferredId);
+  if (preferred) currentAssistantSlot = preferred.assistantSlot;
+  renderAssistantSwitcher();
+  renderAiHistory();
+  if (loadSelected) await showCurrentAssistant();
+  else renderActiveConversationSummary();
+}
+
+async function showCurrentAssistant() {
+  viewingArchived = false;
+  renderAssistantSwitcher();
+  renderAiHistory();
+  const conversation = activeAssistantConversation();
+  if (conversation) {
+    currentConversationId = conversation.id;
+    await loadConversation(conversation.id, false);
+  } else {
+    resetAssistantComposer();
   }
 }
 
-async function loadConversation(id) {
+async function loadConversation(id, archived = false) {
   const data = await request(`/api/ai/conversations/${encodeURIComponent(id)}`);
-  currentConversationId = data.conversation.id;
-  applyConversationControls(data.conversation);
+  viewingArchived = archived;
+  if (!archived) {
+    currentConversationId = data.conversation.id;
+    currentAssistantSlot = data.conversation.assistantSlot;
+    applyConversationControls(data.conversation);
+  }
+  renderConversationHeader(data.conversation, archived);
   renderAiMessages(data.messages);
+  aiForm.hidden = archived;
+  if (archived) {
+    finishAiRequest();
+    aiStatus.textContent = "읽기 전용 이전 문맥";
+    return;
+  }
   const active = [...data.messages].reverse().find(
     (message) => message.role === "assistant" && ["pending", "streaming"].includes(message.status),
   );
@@ -208,18 +259,27 @@ async function loadConversation(id) {
   }
 }
 
-function resetConversationComposer() {
+function resetAssistantComposer() {
   currentConversationId = "";
+  viewingArchived = false;
+  aiForm.hidden = false;
+  aiAssistantName.textContent = assistantName(currentAssistantSlot);
+  aiContextTitle.textContent = currentAssistantSlot === 1 ? "첫 메시지로 시작하세요" : "보조 비서를 설정하세요";
+  aiProviderBadge.hidden = true;
+  aiProviderControl.hidden = false;
+  aiResetContext.hidden = true;
+  aiReturnCurrent.hidden = true;
   aiProvider.disabled = false;
   refreshAiControls();
   aiTranscript.replaceChildren(emptyAiTranscript());
-  aiStatus.textContent = "새 대화";
+  aiStatus.textContent = currentAssistantSlot === 1 ? "주 비서 준비" : "보조 비서 추가";
   finishAiRequest();
 }
 
 function applyConversationControls(conversation) {
   aiProvider.value = conversation.provider;
   aiProvider.disabled = true;
+  aiProviderControl.hidden = true;
   refreshAiControls();
   if ([...aiModel.options].some((option) => option.value === conversation.defaultModel)) {
     aiModel.value = conversation.defaultModel;
@@ -227,6 +287,71 @@ function applyConversationControls(conversation) {
   if ([...aiReasoning.options].some((option) => option.value === conversation.defaultReasoningEffort)) {
     aiReasoning.value = conversation.defaultReasoningEffort;
   }
+}
+
+function renderAssistantSwitcher() {
+  for (const button of aiAssistantSwitcher.querySelectorAll("[data-slot]")) {
+    const slot = Number(button.dataset.slot);
+    const conversation = aiConversations.find((item) => item.assistantSlot === slot);
+    const name = document.createElement("strong");
+    name.textContent = assistantName(slot);
+    const detail = document.createElement("span");
+    detail.textContent = conversation?.title === "새 대화"
+      ? "대화 준비"
+      : conversation?.title ?? (slot === 2 ? "추가하기" : "대화 준비");
+    button.replaceChildren(name, detail);
+    button.classList.toggle("active", slot === currentAssistantSlot && !viewingArchived);
+    button.setAttribute("aria-current", slot === currentAssistantSlot && !viewingArchived ? "true" : "false");
+  }
+}
+
+function renderActiveConversationSummary() {
+  const conversation = activeAssistantConversation();
+  if (conversation && !viewingArchived) renderConversationHeader(conversation, false);
+}
+
+function renderConversationHeader(conversation, archived) {
+  aiAssistantName.textContent = archived
+    ? `${assistantName(conversation.assistantSlot)} · 이전 문맥`
+    : assistantName(conversation.assistantSlot);
+  aiContextTitle.textContent = conversation.title === "새 대화" ? "첫 메시지로 시작하세요" : conversation.title;
+  aiProviderBadge.textContent = conversation.provider;
+  aiProviderBadge.hidden = false;
+  aiResetContext.hidden = archived;
+  aiReturnCurrent.hidden = !archived;
+}
+
+function renderAiHistory() {
+  const history = aiArchivedConversations.filter(
+    (conversation) => conversation.assistantSlot === currentAssistantSlot,
+  );
+  aiHistory.hidden = history.length === 0;
+  aiHistoryCount.textContent = history.length ? `${history.length}` : "";
+  aiHistoryList.replaceChildren(...history.map((conversation) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "history-item";
+    button.dataset.conversationId = conversation.id;
+    const title = document.createElement("strong");
+    title.textContent = conversation.title;
+    const meta = document.createElement("span");
+    meta.textContent = `${conversation.provider} · ${formatShortDate(conversation.archivedAt)}`;
+    button.append(title, meta);
+    return button;
+  }));
+}
+
+function activeAssistantConversation() {
+  return aiConversations.find((conversation) => conversation.assistantSlot === currentAssistantSlot) ?? null;
+}
+
+function assistantName(slot) {
+  return slot === 1 ? "주 비서" : "보조 비서";
+}
+
+function formatShortDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" }).format(new Date(value));
 }
 
 function refreshAiControls() {
@@ -298,8 +423,9 @@ function connectToAiJob(jobId, assistantNode) {
 
 function setAiBusy(busy) {
   aiSubmit.disabled = busy;
-  aiNewConversation.disabled = busy;
-  aiConversation.disabled = busy;
+  for (const button of aiAssistantSwitcher.querySelectorAll("button")) button.disabled = busy;
+  aiResetContext.disabled = busy;
+  aiReturnCurrent.disabled = busy;
   aiCancel.hidden = !busy;
   aiCancel.disabled = false;
 }
@@ -309,7 +435,7 @@ function finishAiRequest() {
   activeEventSource = null;
   activeJobId = "";
   setAiBusy(false);
-  aiMessage.focus();
+  if (!aiForm.hidden) aiMessage.focus();
 }
 
 function renderAiMessages(messages) {
@@ -353,7 +479,7 @@ function buildAiMessage(role, text, meta = "") {
 function emptyAiTranscript() {
   const empty = document.createElement("p");
   empty.className = "empty";
-  empty.textContent = "대화는 이 서버에 저장되며 읽기 전용 AI 요청으로 이어집니다.";
+  empty.textContent = "메시지를 보내면 비서가 이 문맥을 이어갑니다.";
   return empty;
 }
 
@@ -434,9 +560,11 @@ function createClientRequestId() {
 }
 
 async function request(url, init = {}) {
+  const headers = { ...(init.headers || {}) };
+  if (init.body !== undefined) headers["content-type"] = "application/json";
   const response = await fetch(url, {
     ...init,
-    headers: { "content-type": "application/json", ...(init.headers || {}) },
+    headers,
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || `요청 실패 (${response.status})`);
