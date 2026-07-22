@@ -1,22 +1,32 @@
-# Personal Ops Server
+# Personal Executive Office
 
-A local-first personal command center that runs on the owner's home computer and can be reached from a phone, tablet, or another computer through a private network.
+A private, AI-operated executive office for one owner. The system runs on the owner's home computer and is reachable from personal devices through a private tailnet.
 
-The application must work without model APIs. Optional AI features call only the official, locally installed `codex` and `grok` CLIs using their existing subscription authentication.
+The owner communicates naturally and provides raw material. A chief assistant retrieves context, delegates project-management or knowledge-research work, and manages one shared operational world with evidence, validated changes, receipts, and undo.
 
-## Current state
+AI is required for intelligent operation. Inference uses only official locally installed subscription-authenticated `codex` and `grok` CLIs—never model APIs or API keys.
 
-The repository contains:
+## Refoundation status
 
-- a working local Fastify server;
-- SQLite-backed Capture and Task primitives;
-- a minimal browser UI;
-- one primary and one optional secondary AI assistant, with durable archived contexts, streaming, cancellation, and compact model/reasoning controls;
-- non-invasive CLI availability checks;
-- product, architecture, security, and handoff documents;
-- tests for core workflows, durable AI jobs, SSE delivery, and responsive browser behavior.
+The repository currently contains a working technical prototype built around Capture, Tasks, and durable read-only AI conversations. Its infrastructure is being refounded into the executive-office product described in [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
 
-AI execution remains isolated and read-only. Conversation history and job state are stored in SQLite; AI-proposed mutations are not exposed.
+Reusable foundation:
+
+- Fastify on localhost and private Tailscale access;
+- Node's built-in SQLite;
+- durable Codex and Grok CLI jobs;
+- streaming, cancellation, concurrency limits, and restart recovery;
+- a dependency-light browser UI and Playwright verification.
+
+Not yet implemented:
+
+- chief-assistant orchestration and specialist roles;
+- shared project, meeting, decision, people, risk, evidence, and knowledge models;
+- a read-only bridge to the legacy WorkOS source;
+- typed agent mutations, receipts, corrections, and undo;
+- proactive scheduled assistant work.
+
+See [CURRENT_STATE.md](docs/CURRENT_STATE.md) and [ASSISTANT_SYSTEM_REFOUNDATION.md](docs/ASSISTANT_SYSTEM_REFOUNDATION.md) before selecting implementation work.
 
 ## Quick start
 
@@ -24,7 +34,7 @@ Requirements:
 
 - Node.js 24 or newer
 - npm
-- optional: authenticated `codex` and/or `grok` CLI
+- authenticated official `codex` and/or `grok` CLI
 
 ```powershell
 cd <repository-path>
@@ -33,15 +43,7 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
-Open <http://127.0.0.1:4310>.
-
-Before implementation work, run:
-
-```powershell
-codex
-```
-
-Then ask Codex to read `AGENTS.md` and `docs/CURRENT_STATE.md` before choosing the next milestone.
+Open <http://127.0.0.1:4310> locally. Live development servers must also verify tailnet-only Tailscale Serve as described in `AGENTS.md`.
 
 ## Verification
 
@@ -50,16 +52,14 @@ npx playwright install chromium
 npm run verify
 ```
 
-The verification command includes an isolated Playwright UI check on port `4321`. It uses a separate database and a deterministic test-only AI adapter, and stores screenshots, traces, reports, and test data only under the ignored `var/playwright/` directory. Set `OPS_E2E_BASE_URL` in `.env` only when intentionally testing another private deployment.
+The Playwright suite uses isolated test data and keeps artifacts under the ignored `var/playwright/` path.
 
 ## Important boundaries
 
-- No model APIs or API keys.
+- No model APIs, SDK model calls, or model API keys.
 - No public internet exposure.
-- No automatic access to a legacy personal vault.
-- No browser-accessible shell.
-- No AI dependency for core task operations.
-
-Machine-specific development settings belong in the ignored `.env` file. Keep `.env.example` limited to safe placeholder values. CLI authentication remains in the operating-system credential store and must never be copied into `.env`.
-
-See [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md) for the full product context.
+- No automatic access to personal source data outside the repository.
+- No browser-accessible shell, arbitrary paths, raw SQL, or provider protocol.
+- Models propose typed operations; application code validates and commits them.
+- Machine-specific settings belong only in ignored `.env` files.
+- Public commits must not contain personal data, imported evidence, machine paths, private hostnames, credentials, databases, or logs.
