@@ -56,7 +56,9 @@ Proactive agents may create recommendations and proposals. They must not silentl
 - Never add or use OpenAI, xAI, or other model API keys, SDK model calls, direct HTTP model calls, or pay-per-token API integrations.
 - AI access may use only official locally installed subscription-authenticated CLIs: `codex` and `grok`.
 - Do not extract, copy, print, transmit, or manipulate CLI authentication tokens or credential files.
-- Any legacy WorkOS vault outside this repository is outside the project's standing authority. Do not read, write, migrate, index, or transmit it unless the owner explicitly authorizes the exact source scope and operation. Keep its machine-specific location only in local configuration. Treat any initial bridge as read-only and preserve source provenance.
+- Any legacy WorkOS vault outside this repository is outside the project's standing authority. Do not read, write, migrate, index, or transmit it unless the owner explicitly authorizes the exact source scope and operation. A prior inspection or one-time read does not create continuing authority for indexing, migration, or later turns. Keep its machine-specific location only in local configuration. Treat any future adapter as read-only by default and preserve source provenance.
+- The product must install, start, operate, test, back up, and evolve without any legacy WorkOS vault. Treat WorkOS only as optional historical reference material and a possible future import source.
+- Do not encode WorkOS folders, frontmatter, wikilinks, task syntax, agent skills, or file paths into the canonical domain model. Any future WorkOS ingestion belongs behind a replaceable source adapter that maps legacy records into application-owned evidence and domain contracts.
 - Never expose a general shell, raw command execution, arbitrary filesystem paths, provider protocols, or CLI credentials through the web UI.
 - Bind locally by default. Remote access must use a private authenticated network such as Tailscale Serve, not router port forwarding, Tailscale Funnel, or a public tunnel.
 - The current tailnet is used only by the owner and has no other members. Connected devices belong to the same owner.
@@ -86,8 +88,27 @@ Proactive agents may create recommendations and proposals. They must not silentl
 - Preserve provenance from facts, decisions, actions, and knowledge back to evidence where material.
 - Keep secrets out of the repository, logs, browser responses, prompts, fixtures, and screenshots.
 - Put machine-specific settings such as ports, local paths, and private-network hostnames in the untracked `.env` file. Commit only safe placeholders in `.env.example`; never commit `.env` or any `.env.*` variant other than `.env.example`.
-- Before every public commit, inspect staged files and history for personal paths, hostnames, email addresses, credentials, databases, logs, imported evidence, and runtime data.
+- Never place the owner's username, absolute home path, legacy-vault path, tailnet hostname, device name, or email address in tracked documentation, examples, fixtures, or tests. Use semantic placeholders and resolve real values only from local configuration.
+- Before every public commit, inspect the complete staged file list and staged contents—including newly added files—for personal paths, hostnames, email addresses, credentials, databases, logs, imported evidence, and runtime data. Do not rely only on `git diff --name-only`, because it omits untracked files before staging.
 - Preserve data portability through documented SQLite backup plus Markdown/JSON export. Portability is a recovery property, not an AI-free product mode.
+
+## Repository workflow rules
+
+- For every GitHub operation in this repository, use local `git` plus the authenticated `gh` CLI from the start. This includes repository inspection, issues, pull requests, comments, checks, merges, releases, and branch cleanup.
+- Do not call the GitHub App, GitHub connector, or GitHub MCP tools for this repository, even when a generic workflow or skill recommends a connector-first path. Prior attempts repeatedly returned `Resource not accessible by integration` after local `gh` authentication was already available.
+- Before a publish workflow, run `gh --version`, `gh auth status`, `git status -sb`, inspect the diff, and confirm the remote and default branch. Never expose even masked authentication output in user-facing summaries.
+- Create an `agent/<description>` branch when publishing from `main`, stage only the intended files, run the relevant verification, push, create the PR with `gh pr create`, and merge with `gh pr merge` when authorized.
+- After a merge, verify the PR reports `MERGED`, fast-forward local `main`, confirm `main` matches `origin/main`, prune the remote branch, and remove the merged local branch.
+- Preserve unrelated user changes in a dirty worktree. Do not stage, rewrite, discard, or include them without explicit scope.
+
+## Browser and live-server verification rules
+
+- Before claiming that browser automation or screenshot verification is unavailable, inspect the repository for Playwright and check whether its Chromium runtime is installed. This project has a working project-native Playwright path and does not require an in-app browser or the owner's Chrome profile for local UI verification.
+- Use the isolated project Playwright environment for localhost and tailnet UI workflows. Use the owner's normal Chrome profile or an installed browser extension only when the owner explicitly asks for existing signed-in browser state.
+- Treat the Galaxy Tab over Tailscale as a required compatibility target. The tailnet page may be served in a context where optional browser APIs are missing even when desktop localhost supports them.
+- Feature-detect optional Web APIs and provide tested fallbacks when practical. In particular, never call `crypto.randomUUID` without a compatibility path.
+- Test at the relevant tablet viewport and through the actual Tailscale-served URL when changing responsive layout, browser-only APIs, streaming, or remote interaction.
+- Starting or restarting the live application is incomplete until Tailscale Serve is also running and both endpoints are verified. Confirm more than HTTP 200: check the health response and verify that the served page contains a marker from the current build.
 
 ## Interface principles
 

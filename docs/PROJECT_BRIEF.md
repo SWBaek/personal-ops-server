@@ -2,7 +2,7 @@
 
 ## Product definition
 
-WorkOS is an AI-operated personal executive office for one owner.
+Personal Ops Server is an AI-operated personal executive office for one owner.
 
 The owner speaks naturally and supplies fragments of the real world: thoughts, requests, meeting material, documents, questions, commitments, and corrections. A chief assistant understands the intent, recovers the relevant context, delegates specialist work when useful, and manages schedule, projects, knowledge, decisions, and follow-up through an application-owned operational ledger.
 
@@ -11,6 +11,8 @@ This is not a task manager with an optional chat panel. AI is the operating inte
 ## Background
 
 The legacy WorkOS vault contains more than tasks. It joins projects, meetings, decisions, technical and operational knowledge, personal thinking, dates, relationships, and agent procedures. Its useful insight was that the owner should be able to provide raw context while an AI operator performs the classification, connection, maintenance, and follow-up.
+
+The legacy WorkOS vault is historical reference material, not a product dependency. The new service owns its domain language, storage, workflows, and tests and must be fully useful when no WorkOS vault exists. A future import may absorb selected historical data through a replaceable adapter, but legacy folders, metadata, wikilinks, and task syntax do not define the new canonical model.
 
 The first version of this repository retained only Capture, Today, task completion, deferral, and optional read-only AI chat. That implementation proved useful infrastructure—private remote access, durable CLI jobs, SQLite, streaming, and browser verification—but narrowed the product until it no longer represented the intended professional-assistant relationship.
 
@@ -29,7 +31,7 @@ The owner's work arrives through many channels and has several coupled dimension
 
 Ordinary tools split these dimensions across task lists, calendars, folders, chat histories, and the owner's memory. The owner then pays the cost of categorizing inputs, restoring context, deciding where information belongs, and checking whether follow-up happened.
 
-WorkOS should absorb that coordination cost.
+Personal Ops Server should absorb that coordination cost.
 
 ## Human and assistant relationship
 
@@ -130,4 +132,5 @@ The product does not promise useful assistant operation without AI. It does prom
 - unrestricted self-modifying agents or an automatic skill marketplace;
 - public SaaS or multi-user tenancy;
 - direct model APIs or API-key-based inference;
-- a big-bang rewrite or unreviewed migration of the legacy WorkOS vault.
+- required access to, synchronization with, or runtime dependence on the legacy WorkOS vault;
+- a big-bang rewrite or unreviewed migration of any historical source.

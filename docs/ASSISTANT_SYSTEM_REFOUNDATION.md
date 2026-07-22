@@ -72,7 +72,7 @@ The first mutation workflow should apply one explicitly requested project action
 
 Owns research and synthesis, not truth by assertion. It searches authorized internal evidence and, when explicitly enabled for a request, external sources. It separates claims, evidence, inference, contradiction, and open questions.
 
-The first workflow should answer a bounded question using existing WorkOS knowledge and related project evidence. A later workflow may create a knowledge artifact with provenance after review.
+The first workflow should answer a bounded question using application-native evidence and project context. A later workflow may create a knowledge artifact with provenance after review. Historical WorkOS material may participate only after an optional importer is separately authorized and implemented.
 
 ## Shared information model
 
@@ -92,7 +92,7 @@ These records form a rebuildable read index. They do not become a competing writ
 
 ### First canonical write model
 
-Add only when the read bridge and migration boundary are accepted:
+Add only when the native read, provenance, and context contracts are accepted:
 
 - stable operational IDs;
 - projects and their current state;
@@ -134,7 +134,7 @@ People and richer knowledge structures should enter with the first workflow that
 - AI-free duplicate workflows;
 - browser-facing CLI controls;
 - free-form model access to the repository, vault, database, or home directory;
-- a generic orchestration framework before a real WorkOS workflow needs it.
+- a generic orchestration framework before a real assistant workflow needs it.
 
 ## Delivery sequence
 
@@ -149,32 +149,32 @@ Acceptance:
 - Superseded optional-AI and two-assistant-slot decisions are explicitly marked.
 - No code or legacy personal data is changed.
 
-### Phase 1 — Authorized read-only WorkOS bridge
+### Phase 1 — Native evidence and context foundation
 
-Outcome: the application can build a private, rebuildable index from an explicitly authorized legacy source without modifying it.
+Outcome: the application can store native evidence, build a private rebuildable read index, and assemble source-neutral context without any legacy data source.
 
 Scope:
 
-- define the exact authorized root and supported file types in machine-local configuration;
-- parse a narrow set of Project, Meeting, Knowledge, task, date, and wikilink conventions;
-- store hashes, source identities, excerpts, and parser diagnostics;
-- support full rebuild and incremental refresh;
+- define application-owned `SourceDocument`, `SourceChunk`, provenance, subject, and relationship contracts;
+- add versioned SQLite migrations and full-text retrieval;
+- ingest native captures and explicitly uploaded or pasted text through a narrow source interface;
+- store hashes, source identities, excerpts, trust metadata, and ingestion diagnostics;
+- support deterministic rebuild and idempotent re-ingestion;
 - expose application-domain queries, never arbitrary browser paths;
-- exclude credentials, agent runtime mirrors, Git internals, attachments, and unsupported private material by default;
-- keep the index and fixtures out of the public repository.
+- use synthetic fixtures for all repository tests.
 
 Acceptance:
 
-- source files remain byte-for-byte unchanged;
-- repeat indexing is idempotent;
-- deletion or rename in the source produces a deterministic index result without deleting source data;
-- representative project, meeting, action, and knowledge records match known source evidence;
+- a clean installation works with no external vault or historical source;
+- native captures can become searchable evidence without losing their original text;
+- repeat ingestion is idempotent;
 - source locators are sanitized before browser delivery;
-- tests use synthetic fixtures, never copied personal content.
+- deleting or rebuilding the derived index does not delete canonical evidence;
+- unit and integration tests use only synthetic content.
 
 ### Phase 2 — Chief assistant grounded question workflow
 
-Outcome: the owner can ask one bounded question and receive an answer grounded in indexed WorkOS context.
+Outcome: the owner can ask one bounded question and receive an answer grounded in application-native indexed context.
 
 Scope:
 
@@ -265,11 +265,23 @@ Acceptance:
 - proactive work does not mutate canonical state without the authority defined for that job;
 - delivery is private, concise, and linked to evidence and receipts.
 
+### Phase 7 — Optional historical-source import
+
+Outcome: selected historical data can be proposed for absorption without making any source system a permanent dependency.
+
+Implement a source-neutral adapter interface first. A WorkOS adapter may then be added as one optional implementation after exact read scope and import behavior are approved.
+
+Acceptance:
+
+- disabling or removing the adapter does not affect native operation;
+- source-specific folders, metadata, links, and task syntax stop at the adapter boundary;
+- import candidates retain provenance and require an explicit canonical-acceptance policy;
+- the source remains unchanged in read-only mode;
+- tests use synthetic legacy-shaped fixtures rather than copied personal data.
+
 ## Evaluation strategy
 
-The legacy WorkOS corpus is valuable as a private benchmark, not as public test data.
-
-Maintain a local evaluation set of representative questions and expected evidence targets covering:
+Maintain an application-native evaluation set of representative questions and expected evidence targets covering:
 
 - project-state recovery;
 - action and due-date distinction;
@@ -280,11 +292,11 @@ Maintain a local evaluation set of representative questions and expected evidenc
 - ambiguous subjects;
 - owner corrections.
 
-Public tests use synthetic equivalents. Evaluation should inspect retrieval targets, structured intents, receipts, and committed state—not only the fluency of the final response.
+All repository tests use synthetic data. If separately authorized later, selected historical WorkOS scenarios may provide an optional private regression corpus, but they are never required for the baseline suite. Evaluation should inspect retrieval targets, structured intents, receipts, and committed state—not only the fluency of the final response.
 
 ## Decisions deferred on purpose
 
-- canonical migration from Markdown to SQLite;
+- migration of accepted canonical records between storage representations;
 - embeddings and vector search;
 - graph database or generalized temporal graph;
 - additional permanent agent roles;
@@ -294,6 +306,7 @@ Public tests use synthetic equivalents. Evaluation should inspect retrieval targ
 - autonomous external communication;
 - native mobile applications;
 - adoption of Hermes, Letta, CoWork OS, or another general agent runtime.
+- optional WorkOS or other historical-source import adapters.
 
 Each is reconsidered only when an accepted workflow exposes a concrete limitation.
 
@@ -301,11 +314,11 @@ Each is reconsidered only when an accepted workflow exposes a concrete limitatio
 
 Before Phase 1 code, define:
 
-1. the exact read-only source authorization and local configuration contract;
-2. the supported legacy parser contract and exclusion rules;
-3. the read-index SQLite schema and provenance model;
+1. the application-owned evidence, excerpt, provenance, and subject contracts;
+2. the versioned SQLite migration and rebuildable read-index schema;
+3. the native capture/text ingestion contract and exclusion rules;
 4. the chief-assistant context-package schema;
-5. a small private benchmark with synthetic public-test counterparts;
+5. a small synthetic benchmark for retrieval and citation behavior;
 6. browser-safe source citation behavior.
 
-The first implementation PR should prove one end-to-end grounded question. It should not attempt migration, mutation, general multi-agent orchestration, or a complete knowledge graph.
+The first implementation PR should prove the native evidence/index boundary with synthetic data. The next should prove one end-to-end grounded question. Neither should attempt historical import, mutation, general multi-agent orchestration, or a complete knowledge graph.

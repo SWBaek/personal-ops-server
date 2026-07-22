@@ -8,11 +8,13 @@ Each decision is marked **Active**, **Superseded**, or **Transitional**. Superse
 
 The application lives in an independent public repository outside the legacy personal vault. This isolates application code, runtime data, secrets, and release history from personal source material.
 
-## 2026-07-22 — Preserve the legacy WorkOS source
+## 2026-07-22 — Keep legacy WorkOS optional and independent
 
 **Status: Active, clarified by the refoundation**
 
-The legacy vault is not implicitly part of this repository's authority. Future integration begins as an explicitly authorized read-only source bridge with provenance and a rebuildable index. Reading does not authorize migration, rewriting, deletion, or external transmission. Canonical ownership changes require a later reviewed decision.
+The legacy vault is historical reference material and a possible future import source, not a runtime, development, test, or product dependency. WorkOS formats do not define the new application's canonical model.
+
+Any future integration begins as an explicitly authorized read-only adapter with provenance and a rebuildable import index. Reading does not authorize migration, rewriting, deletion, or external transmission. The application must remain fully operable when the adapter is absent, and canonical ownership changes require a later reviewed decision.
 
 ## 2026-07-22 — No model APIs
 
@@ -32,7 +34,7 @@ The replacement decision is “AI operates the product” below. Deterministic s
 
 **Status: Active**
 
-WorkOS is an AI-dependent personal executive office. The owner provides natural-language direction, evidence, values, corrections, and consequential approval. A chief assistant interprets requests, assembles context, delegates specialists, and manages the shared operational world through typed application tools.
+Personal Ops Server is an AI-dependent personal executive office. The owner provides natural-language direction, evidence, values, corrections, and consequential approval. A chief assistant interprets requests, assembles context, delegates specialists, and manages the shared operational world through typed application tools.
 
 If a supported AI provider is unavailable, intelligent work stops, queues, or reports a blocked state. The system preserves coherent state and never fabricates completion.
 
@@ -110,4 +112,4 @@ The compact two-slot UI was preferable to unlimited consumer-chat history for th
 
 Useful reference patterns include a shared core across interaction surfaces, bounded curated memory, skills as procedural context, durable scheduling, isolated delegation, checkpoints, shared memory, evidence-aware state, and governed tools.
 
-The project will not adopt an external runtime wholesale because the product needs a WorkOS-specific operational ledger, official CLI-only inference, narrow domain tools, and stricter control over personal evidence. Generic host-terminal access, API-provider assumptions, per-profile data silos, and early self-modifying skills conflict with current boundaries.
+The project will not adopt an external runtime wholesale because the product needs an application-specific operational ledger, official CLI-only inference, narrow domain tools, and stricter control over personal evidence. Generic host-terminal access, API-provider assumptions, per-profile data silos, and early self-modifying skills conflict with current boundaries.
