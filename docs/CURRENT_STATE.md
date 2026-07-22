@@ -12,16 +12,19 @@ Updated: 2026-07-22
 - Task creation, Today/open listing, completion, and rescheduling.
 - Minimal browser UI for the core workflow.
 - Safe, non-AI CLI availability checks.
-- Read-only, single-turn Codex and Grok chat through installed subscription-authenticated CLIs.
+- Durable, read-only Codex and Grok conversations through installed subscription-authenticated CLIs.
 - Allowlisted provider, model, and reasoning controls in the browser.
+- SQLite-backed conversations, messages, idempotent AI jobs, sanitized SSE, cancellation, and restart recovery.
+- Codex app-server text deltas over private stdio with buffered `codex exec` fallback; Grok streaming JSON.
 - Fixed empty AI working directory, provider concurrency locks, two-minute timeout, and bounded output.
+- Isolated Playwright Chromium checks for responsive layout, screenshots, core interactions, AI streaming, and reload recovery.
 - Type checks, tests, and production build scripts.
 
 ## Deliberately not implemented
 
 - Application authentication.
 - structured-intent mutation parsing;
-- AI job persistence, conversation history, streaming, cancellation, and approval;
+- AI approval and structured-intent mutation parsing;
 - search, projects, notes, attachments, and export;
 - database backup and restore automation;
 - Legacy vault migration.
@@ -33,23 +36,22 @@ These are omitted to keep the first trust boundary small.
 Verified on Windows with Node.js 24.18.0 on 2026-07-22:
 
 - `npm run verify` passed;
-- 18 tests passed with no failures;
+- 25 unit/integration tests and 4 Playwright browser tests passed with no failures;
 - TypeScript production build completed;
 - `npm audit --audit-level=moderate` reported zero vulnerabilities;
 - the built server answered `/api/health` successfully on `127.0.0.1:4310`;
 - provider checks detected `codex-cli 0.144.6` and official Grok Build `0.2.106`;
-- live single-turn requests returned expected answers from both Codex and Grok;
+- live durable streaming requests returned expected answers from both Codex and Grok;
 - the Grok request was also verified through the tailnet-only Tailscale Serve URL.
 
 ## Recommended next milestone
 
-Make the working AI chat durable without enabling data mutation:
+Implement durable non-AI search next, while keeping AI mutation disabled:
 
-1. add a durable `ai_jobs` table and idempotent state transitions;
-2. add explicit cancellation and sanitized streaming events;
-3. decide whether conversation history should remain browser-local or become resumable provider threads;
-4. add application authentication before persistent conversations or AI-proposed mutations;
-5. keep structured mutation interpretation and approval as a separate later milestone.
+1. add deterministic search across captures and tasks;
+2. add documented JSON/Markdown export and SQLite backup;
+3. add application authentication before access expands beyond the owner's current tailnet;
+4. keep structured AI mutation interpretation and approval as a separate later milestone.
 
 ## First Codex prompt
 

@@ -49,9 +49,12 @@ npm install
 npm run dev
 npm run typecheck
 npm test
+npm run test:e2e
 npm run build
 npm run verify
 ```
+
+Install the Playwright Chromium runtime once on a development machine with `npx playwright install chromium`. Browser-test screenshots, traces, reports, and isolated test data must stay under ignored artifact paths and must never contain production or personal data.
 
 The local service defaults to `http://127.0.0.1:4310`.
 

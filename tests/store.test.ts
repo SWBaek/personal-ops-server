@@ -57,3 +57,121 @@ test("completing and deferring a task changes canonical state", () => {
   }
 });
 
+test("AI conversations persist ordered messages and idempotent jobs", () => {
+  const store = new OpsStore(":memory:");
+  try {
+    const conversation = store.createAiConversation({
+      provider: "codex",
+      model: "gpt-5.6",
+      reasoningEffort: "high",
+    });
+    const turn = store.createAiTurn({
+      conversationId: conversation.id,
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      message: "첫 질문입니다",
+      model: "gpt-5.6",
+      reasoningEffort: "high",
+    });
+    const duplicate = store.createAiTurn({
+      conversationId: conversation.id,
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      message: "무시되는 중복 요청",
+      model: "gpt-5.6",
+      reasoningEffort: "high",
+    });
+
+    assert.equal(duplicate.duplicate, true);
+    assert.equal(duplicate.job.id, turn.job.id);
+    const otherConversation = store.createAiConversation({
+      provider: "codex",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    assert.throws(() => store.createAiTurn({
+      conversationId: otherConversation.id,
+      clientRequestId: "11111111-1111-4111-8111-111111111111",
+      message: "다른 대화의 중복 키",
+      model: "default",
+      reasoningEffort: "default",
+    }), /another conversation/);
+    assert.deepEqual(
+      store.listAiMessages(conversation.id).map((message) => [message.role, message.content]),
+      [["user", "첫 질문입니다"], ["assistant", ""]],
+    );
+    assert.equal(store.getAiConversation(conversation.id)?.title, "첫 질문입니다");
+  } finally {
+    store.close();
+  }
+});
+
+test("AI jobs follow durable terminal transitions", () => {
+  const store = new OpsStore(":memory:");
+  try {
+    const conversation = store.createAiConversation({
+      provider: "grok",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    const turn = store.createAiTurn({
+      conversationId: conversation.id,
+      clientRequestId: "22222222-2222-4222-8222-222222222222",
+      message: "계속 이야기해 주세요",
+      model: "default",
+      reasoningEffort: "default",
+    });
+
+    assert.equal(store.startAiJob(turn.job.id)?.status, "running");
+    store.updateAiJobPartial(turn.job.id, "부분 응답");
+    store.completeAiJob(turn.job.id, {
+      content: "완성 응답",
+      inputTokens: 5,
+      cachedInputTokens: 1,
+      outputTokens: 3,
+      reasoningTokens: 2,
+      durationMs: 25,
+      providerThreadId: "provider-thread",
+    });
+
+    assert.equal(store.getAiJob(turn.job.id)?.status, "succeeded");
+    assert.deepEqual(store.listAiMessages(conversation.id).at(-1), {
+      ...turn.assistantMessage,
+      content: "완성 응답",
+      status: "completed",
+      inputTokens: 5,
+      cachedInputTokens: 1,
+      outputTokens: 3,
+      reasoningTokens: 2,
+      durationMs: 25,
+      updatedAt: store.listAiMessages(conversation.id).at(-1)?.updatedAt,
+    });
+    assert.equal(store.getAiConversation(conversation.id)?.providerThreadId, "provider-thread");
+    assert.equal(store.finishAiJob(turn.job.id, "failed", "late failure"), null);
+  } finally {
+    store.close();
+  }
+});
+
+test("running AI jobs are marked interrupted after restart recovery", () => {
+  const store = new OpsStore(":memory:");
+  try {
+    const conversation = store.createAiConversation({
+      provider: "codex",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    const turn = store.createAiTurn({
+      conversationId: conversation.id,
+      clientRequestId: "33333333-3333-4333-8333-333333333333",
+      message: "중단될 요청",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    store.startAiJob(turn.job.id);
+
+    assert.equal(store.interruptRunningAiJobs(), 1);
+    assert.equal(store.getAiJob(turn.job.id)?.status, "interrupted");
+    assert.equal(store.getAiMessage(turn.assistantMessage.id)?.status, "failed");
+  } finally {
+    store.close();
+  }
+});

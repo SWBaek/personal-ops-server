@@ -6,6 +6,9 @@ dist/
 data/*
 !data/.gitkeep
 var/
+playwright-report/
+test-results/
+blob-report/
 *.log
 *.db
 *.db-*

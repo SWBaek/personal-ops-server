@@ -149,6 +149,23 @@ h2 {
   margin-top: 1rem;
 }
 
+.ai-conversation-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.ai-submit-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ai-submit-row button {
+  flex: 1;
+}
+
 .ai-controls {
   display: grid;
   grid-column: 1 / -1;
@@ -185,6 +202,23 @@ h2 {
 .ai-message p {
   margin: 0.35rem 0 0;
   white-space: pre-wrap;
+}
+
+.ai-message.streaming p::after {
+  content: "";
+  display: inline-block;
+  width: 0.45rem;
+  height: 1em;
+  margin-left: 0.2rem;
+  vertical-align: -0.15em;
+  background: currentColor;
+  animation: ai-cursor 0.85s steps(1) infinite;
+}
+
+@keyframes ai-cursor {
+  50% {
+    opacity: 0;
+  }
 }
 
 .ai-message span {
@@ -310,6 +344,7 @@ label {
 
   .capture-card form,
   .ai-form,
+  .ai-conversation-bar,
   .task-form {
     grid-template-columns: 1fr;
   }

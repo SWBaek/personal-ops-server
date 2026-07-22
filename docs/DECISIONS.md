@@ -37,3 +37,15 @@ The official Codex SDK is a useful future option for streaming and resumable Cod
 A follow-up review confirmed that the TypeScript SDK wraps the Codex CLI and exchanges the same JSONL event stream that the current adapter already parses. Migrating now would not materially improve the single-turn workflow and would introduce a second Codex CLI version boundary through the SDK dependency. Reconsider the SDK when persistent Codex threads, structured streaming, per-turn schemas, or image inputs become an accepted milestone.
 
 Temporary unauthenticated access is limited to the owner's private tailnet for active development inspection. The tailnet currently has no other members and all connected devices belong to the owner. Application authentication remains required before wider use, persistent AI conversations, or AI-proposed mutations.
+
+## 2026-07-22 — Use project-native Playwright for visual verification
+
+CLI development uses Playwright with an isolated Chromium runtime for repeatable layout checks and screenshots. Tests start a temporary localhost server on a dedicated port with separate SQLite and AI working directories. All screenshots, traces, reports, and test data stay under ignored artifact paths. This does not provide access to the owner's normal Chrome profile or signed-in browser sessions.
+
+## 2026-07-22 — Persist read-only AI conversations and stream sanitized events
+
+AI conversations, messages, and job state are canonical SQLite data. A conversation is fixed to one provider while model and reasoning effort may change per turn. Requests use a unique client request ID, one active job is allowed per provider, and jobs follow explicit queued, running, and terminal states. Running jobs become interrupted after a server restart rather than being retried automatically.
+
+The project does not adopt any model SDK because repository policy permits only installed subscription-authenticated CLIs. Codex text streaming uses the official CLI's app-server over a child-process stdio transport; it never opens an app-server network listener or exposes raw JSON-RPC to the browser. If this version-sensitive integration cannot initialize, the adapter falls back to the stable buffered `codex exec --json` path. Grok uses its official streaming JSON and resumable session flags.
+
+Only assistant text deltas, sanitized state, final usage, and bounded errors cross the SSE boundary. Reasoning, tool output, provider session identifiers, raw stderr, credentials, and CLI diagnostics remain server-side. Temporary unauthenticated use remains restricted to the owner's single-member tailnet; authentication and AI-proposed mutations remain separate later milestones.

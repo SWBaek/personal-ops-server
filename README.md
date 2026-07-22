@@ -11,12 +11,12 @@ The repository contains:
 - a working local Fastify server;
 - SQLite-backed Capture and Task primitives;
 - a minimal browser UI;
-- read-only, single-turn Codex and Grok CLI chat with model and reasoning controls;
+- durable, read-only Codex and Grok CLI conversations with streaming, cancellation, model, and reasoning controls;
 - non-invasive CLI availability checks;
 - product, architecture, security, and handoff documents;
-- tests for the core date and input rules.
+- tests for core workflows, durable AI jobs, SSE delivery, and responsive browser behavior.
 
-AI execution is limited to isolated, read-only, single-turn requests. Durable jobs, conversation history, streaming, cancellation, and AI-proposed mutations are not exposed yet.
+AI execution remains isolated and read-only. Conversation history and job state are stored in SQLite; AI-proposed mutations are not exposed.
 
 ## Quick start
 
@@ -46,8 +46,11 @@ Then ask Codex to read `AGENTS.md` and `docs/CURRENT_STATE.md` before choosing t
 ## Verification
 
 ```powershell
+npx playwright install chromium
 npm run verify
 ```
+
+The verification command includes an isolated Playwright UI check on port `4321`. It uses a separate database and a deterministic test-only AI adapter, and stores screenshots, traces, reports, and test data only under the ignored `var/playwright/` directory. Set `OPS_E2E_BASE_URL` in `.env` only when intentionally testing another private deployment.
 
 ## Important boundaries
 

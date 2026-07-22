@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import { CliAiChatService } from "./ai/chat-service.js";
+import { AiConversationService, CliStreamingProvider } from "./ai/streaming-service.js";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { OpsStore } from "./infra/store.js";
@@ -10,9 +11,14 @@ const store = new OpsStore(join(config.dataDir, "personal-ops.db"));
 const aiChatService = new CliAiChatService({
   workingDirectory: config.aiWorkingDir,
 });
-const app = await buildApp({ store, aiChatService });
+const aiConversationService = new AiConversationService(
+  store,
+  new CliStreamingProvider({ workingDirectory: config.aiWorkingDir }),
+);
+const app = await buildApp({ store, aiChatService, aiConversationService });
 
 app.addHook("onClose", async () => {
+  await aiConversationService.close();
   store.close();
 });
 

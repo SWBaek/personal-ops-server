@@ -101,6 +101,15 @@
             </div>
             <span id="ai-status" class="status" aria-live="polite"></span>
           </div>
+          <div class="ai-conversation-bar">
+            <label>
+              대화
+              <select id="ai-conversation" name="conversation">
+                <option value="">새 대화</option>
+              </select>
+            </label>
+            <button id="ai-new-conversation" class="quiet" type="button">새 대화</button>
+          </div>
           <form id="ai-form" class="ai-form">
             <div class="ai-controls">
               <label>
@@ -127,10 +136,13 @@
                 required
               ></textarea>
             </label>
-            <button id="ai-submit" type="submit">보내기</button>
+            <div class="ai-submit-row">
+              <button id="ai-submit" type="submit">보내기</button>
+              <button id="ai-cancel" class="quiet" type="button" hidden>취소</button>
+            </div>
           </form>
           <div id="ai-transcript" class="ai-transcript" aria-live="polite">
-            <p class="empty">각 메시지는 독립적인 읽기 전용 요청으로 실행됩니다.</p>
+            <p class="empty">대화는 이 서버에 저장되며 읽기 전용 AI 요청으로 이어집니다.</p>
           </div>
         </section>
       </aside>
