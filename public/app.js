@@ -1,113 +1,206 @@
-const captureForm = document.querySelector("#capture-form");
-const captureBody = document.querySelector("#capture-body");
-const captureStatus = document.querySelector("#capture-status");
-const taskForm = document.querySelector("#task-form");
-const todayList = document.querySelector("#today-list");
-const openList = document.querySelector("#open-list");
-const providerList = document.querySelector("#provider-list");
-const taskTemplate = document.querySelector("#task-template");
+const body = document.body;
+const currentDate = document.querySelector("#current-date");
+const viewKicker = document.querySelector("#view-kicker");
+const viewTitle = document.querySelector("#view-title");
+const assistantView = document.querySelector("#assistant-view");
+const projectOverview = document.querySelector("#project-overview");
+const inboxView = document.querySelector("#inbox-view");
+const inboxList = document.querySelector("#inbox-list");
+const inboxStatus = document.querySelector("#inbox-status");
+const inboxCount = document.querySelector("#inbox-count");
+const inboxRefresh = document.querySelector("#inbox-refresh");
+const debugView = document.querySelector("#debug-view");
+const debugSummary = document.querySelector("#debug-summary");
+const debugDataset = document.querySelector("#debug-dataset");
+const debugLimit = document.querySelector("#debug-limit");
+const debugRefresh = document.querySelector("#debug-refresh");
+const debugStatus = document.querySelector("#debug-status");
+const debugTableWrap = document.querySelector("#debug-table-wrap");
+const debugTableHead = document.querySelector("#debug-table-head");
+const debugTableBody = document.querySelector("#debug-table-body");
+const assistantComposer = document.querySelector("#assistant-composer");
+const contextPanel = document.querySelector("#context-panel");
+const contextToggles = document.querySelectorAll(".context-toggle");
+const contextClose = document.querySelector(".context-close");
+const contextScrim = document.querySelector(".context-scrim");
+const toast = document.querySelector("#toast");
 const aiForm = document.querySelector("#ai-form");
-const aiAssistantSwitcher = document.querySelector("#ai-assistant-switcher");
-const aiAssistantName = document.querySelector("#ai-assistant-name");
-const aiContextTitle = document.querySelector("#ai-context-title");
-const aiProviderBadge = document.querySelector("#ai-provider-badge");
-const aiProviderControl = document.querySelector("#ai-provider-control");
-const aiResetContext = document.querySelector("#ai-reset-context");
-const aiReturnCurrent = document.querySelector("#ai-return-current");
-const aiHistory = document.querySelector("#ai-history");
-const aiHistoryCount = document.querySelector("#ai-history-count");
-const aiHistoryList = document.querySelector("#ai-history-list");
-const aiProvider = document.querySelector("#ai-provider");
-const aiModel = document.querySelector("#ai-model");
-const aiReasoning = document.querySelector("#ai-reasoning");
 const aiMessage = document.querySelector("#ai-message");
 const aiSubmit = document.querySelector("#ai-submit");
 const aiCancel = document.querySelector("#ai-cancel");
 const aiStatus = document.querySelector("#ai-status");
 const aiTranscript = document.querySelector("#ai-transcript");
+const dynamicTranscript = document.querySelector("#dynamic-transcript");
+const conversationScroller = document.querySelector(".conversation");
+const aiProvider = document.querySelector("#ai-provider");
+const aiModel = document.querySelector("#ai-model");
+const aiReasoning = document.querySelector("#ai-reasoning");
+const modelSummary = document.querySelector("#model-summary");
+const modelMenu = document.querySelector(".model-menu");
+const newContext = document.querySelector("#new-context");
+const settingsDialog = document.querySelector("#settings-dialog");
+const settingsClose = document.querySelector("#settings-close");
+const destructiveConfirmation = document.querySelector("#destructive-confirmation");
+const confirmationTitle = document.querySelector("#confirmation-title");
+const confirmationDescription = document.querySelector("#confirmation-description");
+const confirmationCancel = document.querySelector("#confirmation-cancel");
+const confirmationSubmit = document.querySelector("#confirmation-submit");
+const settingsStatus = document.querySelector("#settings-status");
+const mobileDebugButton = document.querySelector("#mobile-debug-button");
+const assistantProfileForm = document.querySelector("#assistant-profile-form");
+const assistantProfileName = document.querySelector("#assistant-profile-name");
+const assistantOwnerAddress = document.querySelector("#assistant-owner-address");
+const assistantRoleDescription = document.querySelector("#assistant-role-description");
+const assistantCommunicationStyle = document.querySelector("#assistant-communication-style");
+const assistantWorkingPrinciples = document.querySelector("#assistant-working-principles");
+const assistantProfileVersion = document.querySelector("#assistant-profile-version");
+const assistantProfileStatus = document.querySelector("#assistant-profile-status");
+const assistantProfileSubmit = document.querySelector("#assistant-profile-submit");
+const aiRuntimeStatus = document.querySelector("#ai-runtime-status");
+const previewAssistantName = document.querySelector("#preview-assistant-name");
 
-let aiProviderOptions = [];
-let aiConversations = [];
-let aiArchivedConversations = [];
-let currentAssistantSlot = 1;
-let currentConversationId = "";
-let viewingArchived = false;
+let providerOptions = [];
+let conversationId = "";
 let activeJobId = "";
 let activeEventSource = null;
+let toastTimer = null;
+let pendingResetMode = "";
+let activeInboxStatus = "pending";
+let assistantProfile = { name: "주 비서" };
 
-captureForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  captureStatus.textContent = "저장 중…";
-  try {
-    await request("/api/captures", {
-      method: "POST",
-      body: JSON.stringify({ body: captureBody.value }),
-    });
-    captureBody.value = "";
-    captureStatus.textContent = "저장됨";
-  } catch (error) {
-    captureStatus.textContent = error.message;
+const resetModes = {
+  chat: {
+    title: "대화 기록을 삭제할까요?",
+    description: "모든 비서 대화, 메시지, 응답 사용량과 AI 작업 기록이 영구 삭제됩니다.",
+    actionLabel: "대화 기록 삭제",
+    endpoint: "/api/ai/history/clear",
+    confirmation: "DELETE_AI_HISTORY",
+    success: "대화 기록을 모두 삭제했습니다.",
+  },
+  all: {
+    title: "모든 데이터를 초기화할까요?",
+    description: "현재 애플리케이션의 수집 자료, 비서 메모, 작업, 모든 비서 대화와 AI 작업 기록이 영구 삭제되고 비서 구성이 기본값으로 돌아갑니다. CLI 로그인, 관리형 AI 런타임과 Tailscale 설정은 유지됩니다.",
+    actionLabel: "모든 데이터 초기화",
+    endpoint: "/api/system/reset-data",
+    confirmation: "RESET_ALL_DATA",
+    success: "애플리케이션 데이터를 모두 초기화했습니다.",
+  },
+};
+
+currentDate.textContent = new Intl.DateTimeFormat("ko-KR", {
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+}).format(new Date());
+
+for (const toggle of contextToggles) {
+  toggle.addEventListener("click", () => setContextOpen(!body.classList.contains("context-open")));
+}
+contextClose.addEventListener("click", () => setContextOpen(false));
+contextScrim.addEventListener("click", () => setContextOpen(false));
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") setContextOpen(false);
+});
+
+for (const button of document.querySelectorAll("[data-view]")) {
+  button.addEventListener("click", () => {
+    if (["비서", "프로젝트 개요", "받은함", "디버그"].includes(button.dataset.view)) {
+      showView(button.dataset.view);
+      return;
+    }
+    showToast(`${button.dataset.view} 화면은 구조 확정 후 연결됩니다.`);
+  });
+}
+
+inboxRefresh.addEventListener("click", () => void loadInbox());
+debugRefresh.addEventListener("click", () => void loadDebug());
+debugDataset.addEventListener("change", () => void loadDebugDataset());
+debugLimit.addEventListener("change", () => void loadDebugDataset());
+for (const button of document.querySelectorAll("[data-inbox-status]")) {
+  button.addEventListener("click", () => {
+    activeInboxStatus = button.dataset.inboxStatus;
+    for (const tab of document.querySelectorAll("[data-inbox-status]")) {
+      const active = tab === button;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", String(active));
+    }
+    void loadInbox();
+  });
+}
+
+for (const button of document.querySelectorAll("[data-prototype-action]")) {
+  button.addEventListener("click", () => showToast(`${button.dataset.prototypeAction} 기능은 현재 UI 시안입니다.`));
+}
+
+document.querySelector("#search-button").addEventListener("click", () => showToast("통합 검색은 다음 화면 설계에서 연결합니다."));
+document.querySelector("#attach-button").addEventListener("click", () => showToast("자료 추가 흐름은 UI 구조 확정 후 연결합니다."));
+document.querySelector("#settings-button").addEventListener("click", openSettings);
+document.querySelector("#mobile-settings-button").addEventListener("click", openSettings);
+mobileDebugButton.addEventListener("click", () => {
+  settingsDialog.close();
+  showView("디버그");
+});
+settingsClose.addEventListener("click", () => settingsDialog.close());
+settingsDialog.addEventListener("click", (event) => {
+  if (event.target === settingsDialog) settingsDialog.close();
+});
+
+for (const button of document.querySelectorAll("[data-reset-mode]")) {
+  button.addEventListener("click", () => showResetConfirmation(button.dataset.resetMode));
+}
+confirmationCancel.addEventListener("click", hideResetConfirmation);
+confirmationSubmit.addEventListener("click", performDataReset);
+assistantProfileForm.addEventListener("submit", (event) => void saveAssistantProfile(event));
+
+for (const button of document.querySelectorAll("[data-prompt]")) {
+  button.addEventListener("click", () => {
+    aiMessage.value = button.dataset.prompt;
+    resizeComposer();
+    aiMessage.focus();
+  });
+}
+
+aiMessage.addEventListener("input", resizeComposer);
+aiMessage.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    aiForm.requestSubmit();
   }
 });
 
-taskForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const form = new FormData(taskForm);
-  await request("/api/tasks", {
-    method: "POST",
-    body: JSON.stringify({
-      title: form.get("title"),
-      scheduledOn: form.get("scheduledOn") || null,
-      dueOn: form.get("dueOn") || null,
-    }),
-  });
-  taskForm.reset();
-  await refreshTasks();
+aiProvider.addEventListener("change", () => {
+  refreshModelControls();
+  updateModelSummary();
 });
+aiModel.addEventListener("change", updateModelSummary);
+aiReasoning.addEventListener("change", updateModelSummary);
 
-document.querySelector("#refresh").addEventListener("click", refreshAll);
-aiProvider.addEventListener("change", refreshAiControls);
-aiAssistantSwitcher.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-slot]");
-  if (!button || activeJobId) return;
-  currentAssistantSlot = Number(button.dataset.slot);
-  viewingArchived = false;
-  await showCurrentAssistant();
-});
-aiResetContext.addEventListener("click", async () => {
-  if (!currentConversationId || activeJobId) return;
-  if (!window.confirm("현재 문맥을 초기화할까요? 지금까지의 기록은 이전 문맥에 보존됩니다.")) return;
-  aiResetContext.disabled = true;
-  aiStatus.textContent = "문맥 초기화 중…";
+newContext.addEventListener("click", async () => {
+  if (!conversationId) {
+    dynamicTranscript.replaceChildren();
+    aiMessage.focus();
+    return;
+  }
+  if (!window.confirm("현재 대화를 보관하고 새 문맥을 시작할까요?")) return;
+  newContext.disabled = true;
+  aiStatus.textContent = "새 문맥을 준비하는 중…";
   try {
-    const reset = await request(
-      `/api/ai/conversations/${encodeURIComponent(currentConversationId)}/reset`,
-      { method: "POST" },
-    );
-    currentConversationId = reset.conversation.id;
-    await refreshAiConversations(currentConversationId, true);
-    aiStatus.textContent = "새 문맥";
+    const result = await request(`/api/ai/conversations/${encodeURIComponent(conversationId)}/reset`, { method: "POST" });
+    conversationId = result.conversation.id;
+    dynamicTranscript.replaceChildren();
+    aiStatus.textContent = "새 문맥이 준비되었습니다";
+    applyConversation(result.conversation);
   } catch (error) {
     aiStatus.textContent = error.message;
   } finally {
-    aiResetContext.disabled = false;
+    newContext.disabled = false;
   }
 });
-aiReturnCurrent.addEventListener("click", async () => {
-  viewingArchived = false;
-  await showCurrentAssistant();
-});
-aiHistoryList.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-conversation-id]");
-  if (!button || activeJobId) return;
-  viewingArchived = true;
-  await loadConversation(button.dataset.conversationId, true);
-  aiHistory.open = false;
-});
+
 aiCancel.addEventListener("click", async () => {
   if (!activeJobId) return;
   aiCancel.disabled = true;
-  aiStatus.textContent = "취소 중…";
+  aiStatus.textContent = "취소하는 중…";
   try {
     await request(`/api/ai/jobs/${encodeURIComponent(activeJobId)}/cancel`, { method: "POST" });
   } catch (error) {
@@ -121,440 +214,600 @@ aiForm.addEventListener("submit", async (event) => {
   const text = aiMessage.value.trim();
   if (!text || activeJobId) return;
 
-  setAiBusy(true);
-  aiStatus.textContent = "요청 저장 중…";
+  setBusy(true);
+  aiStatus.textContent = "요청을 준비하는 중…";
   try {
-    if (!currentConversationId) {
+    if (!conversationId) {
       const created = await request("/api/ai/conversations", {
         method: "POST",
         body: JSON.stringify({
-          assistantSlot: currentAssistantSlot,
+          assistantSlot: 1,
           provider: aiProvider.value,
           model: aiModel.value,
           reasoningEffort: aiReasoning.value,
         }),
       });
-      currentConversationId = created.conversation.id;
-      await refreshAiConversations(currentConversationId, false);
-      applyConversationControls(created.conversation);
+      conversationId = created.conversation.id;
+      applyConversation(created.conversation);
     }
 
-    const submitted = await request(
-      `/api/ai/conversations/${encodeURIComponent(currentConversationId)}/messages`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          clientRequestId: createClientRequestId(),
-          message: text,
-          model: aiModel.value,
-          reasoningEffort: aiReasoning.value,
-        }),
-      },
-    );
-    appendAiMessage("user", submitted.userMessage.content);
-    const assistantNode = appendAiMessage("assistant", "", "응답 생성 중…", "streaming");
+    const submitted = await request(`/api/ai/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      method: "POST",
+      body: JSON.stringify({
+        clientRequestId: createClientRequestId(),
+        message: text,
+        model: aiModel.value,
+        reasoningEffort: aiReasoning.value,
+      }),
+    });
+    appendMessage("user", submitted.userMessage.content);
+    const assistantNode = appendMessage("assistant", "", "응답 생성 중…", "streaming");
     aiMessage.value = "";
+    resizeComposer();
     activeJobId = submitted.job.id;
-    aiStatus.textContent = submitted.duplicate ? "기존 요청에 다시 연결 중…" : "응답 받는 중…";
-    connectToAiJob(activeJobId, assistantNode);
-    await refreshAiConversations(currentConversationId, false);
+    aiStatus.textContent = "비서가 답변하는 중…";
+    modelMenu.open = false;
+    connectToJob(activeJobId, assistantNode);
   } catch (error) {
-    appendAiMessage("error", error.message);
-    aiStatus.textContent = "요청 실패";
-    finishAiRequest();
+    appendMessage("error", error.message);
+    aiStatus.textContent = "요청을 완료하지 못했습니다";
+    finishRequest();
   }
 });
 
-async function refreshAll() {
-  await Promise.all([refreshTasks(), refreshProviders()]);
-  await refreshAiOptions();
-  await refreshAiConversations(currentConversationId, true);
+function setContextOpen(open) {
+  body.classList.toggle("context-open", open);
+  for (const toggle of contextToggles) toggle.setAttribute("aria-expanded", String(open));
+  contextPanel.setAttribute("aria-hidden", String(!open && window.matchMedia("(max-width: 960px)").matches));
 }
 
-async function refreshTasks() {
-  const [today, open] = await Promise.all([
-    request("/api/tasks?view=today"),
-    request("/api/tasks?view=open"),
-  ]);
-  renderTasks(todayList, today.tasks, "오늘로 잡힌 행동이 없습니다.");
-  renderTasks(openList, open.tasks, "열린 행동이 없습니다.");
+function showView(view) {
+  const overviewActive = view === "프로젝트 개요";
+  const inboxActive = view === "받은함";
+  const debugActive = view === "디버그";
+  body.classList.toggle("overview-active", overviewActive);
+  body.classList.toggle("inbox-active", inboxActive);
+  body.classList.toggle("debug-active", debugActive);
+  assistantView.hidden = overviewActive || inboxActive || debugActive;
+  assistantComposer.hidden = overviewActive || inboxActive || debugActive;
+  projectOverview.hidden = !overviewActive;
+  inboxView.hidden = !inboxActive;
+  debugView.hidden = !debugActive;
+  viewKicker.textContent = overviewActive
+    ? "PERSONAL OPS"
+    : inboxActive
+      ? "비서 메모"
+      : debugActive
+        ? "개발 도구"
+        : assistantProfile.name;
+  viewTitle.textContent = overviewActive
+    ? "프로젝트 개요"
+    : inboxActive
+      ? "받은함"
+      : debugActive
+        ? "데이터 디버그"
+        : "운영 브리핑";
+  setContextOpen(false);
+
+  for (const button of document.querySelectorAll("[data-view]")) {
+    const active = button.dataset.view === view;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
+
+  if (overviewActive) projectOverview.scrollTo({ top: 0 });
+  else if (inboxActive) void loadInbox();
+  else if (debugActive) void loadDebug();
+  else aiMessage.focus();
 }
 
-async function refreshProviders() {
-  const data = await request("/api/ai/providers");
-  providerList.replaceChildren(
-    ...data.providers.map((provider) => {
-      const item = document.createElement("div");
-      item.className = `provider ${provider.available ? "available" : "unavailable"}`;
-      const name = document.createElement("strong");
-      name.textContent = provider.id;
-      const state = document.createElement("span");
-      state.textContent = provider.available ? provider.version : "사용 불가";
-      item.append(name, state);
-      return item;
-    }),
-  );
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add("visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("visible"), 2200);
 }
 
-async function refreshAiOptions() {
-  const data = await request("/api/ai/options");
-  const selectedProvider = aiProvider.value;
-  aiProviderOptions = data.providers;
-  replaceSelectOptions(aiProvider, data.providers, selectedProvider);
-  refreshAiControls();
+function openSettings() {
+  hideResetConfirmation();
+  settingsDialog.showModal();
+  void loadAssistantSettings();
 }
 
-async function refreshAiConversations(preferredId = "", loadSelected = true) {
-  const data = await request("/api/ai/conversations");
-  aiConversations = data.conversations;
-  aiArchivedConversations = data.archivedConversations ?? [];
-  const preferred = aiConversations.find((conversation) => conversation.id === preferredId);
-  if (preferred) currentAssistantSlot = preferred.assistantSlot;
-  renderAssistantSwitcher();
-  renderAiHistory();
-  if (loadSelected) await showCurrentAssistant();
-  else renderActiveConversationSummary();
-}
-
-async function showCurrentAssistant() {
-  viewingArchived = false;
-  renderAssistantSwitcher();
-  renderAiHistory();
-  const conversation = activeAssistantConversation();
-  if (conversation) {
-    currentConversationId = conversation.id;
-    await loadConversation(conversation.id, false);
-  } else {
-    resetAssistantComposer();
+async function loadAssistantSettings() {
+  assistantProfileStatus.textContent = "";
+  try {
+    const [profileResult, runtimeResult] = await Promise.all([
+      request("/api/assistant/profile"),
+      request("/api/system/runtime"),
+    ]);
+    applyAssistantProfile(profileResult.profile);
+    const runtime = runtimeResult.runtime;
+    aiRuntimeStatus.textContent = `${runtime.mode === "managed" ? "관리형" : "사용자 지정"} · ${runtime.environment}`;
+    aiRuntimeStatus.dataset.isolated = String(runtime.isolated);
+  } catch (error) {
+    assistantProfileStatus.textContent = error.message;
+    aiRuntimeStatus.textContent = "확인 실패";
   }
 }
 
-async function loadConversation(id, archived = false) {
-  const data = await request(`/api/ai/conversations/${encodeURIComponent(id)}`);
-  viewingArchived = archived;
-  if (!archived) {
-    currentConversationId = data.conversation.id;
-    currentAssistantSlot = data.conversation.assistantSlot;
-    applyConversationControls(data.conversation);
-  }
-  renderConversationHeader(data.conversation, archived);
-  renderAiMessages(data.messages);
-  aiForm.hidden = archived;
-  if (archived) {
-    finishAiRequest();
-    aiStatus.textContent = "읽기 전용 이전 문맥";
-    return;
-  }
-  const active = [...data.messages].reverse().find(
-    (message) => message.role === "assistant" && ["pending", "streaming"].includes(message.status),
-  );
-  if (active?.jobId) {
-    const node = aiTranscript.querySelector(`[data-message-id="${CSS.escape(active.id)}"]`)
-      ?? appendAiMessage("assistant", active.content, formatStoredMeta(active), "streaming");
-    setAiBusy(true);
-    activeJobId = active.jobId;
-    connectToAiJob(activeJobId, node);
-  } else {
-    finishAiRequest();
+function applyAssistantProfile(profile) {
+  assistantProfile = profile;
+  assistantProfileName.value = profile.name;
+  assistantOwnerAddress.value = profile.ownerAddress;
+  assistantRoleDescription.value = profile.roleDescription;
+  assistantCommunicationStyle.value = profile.communicationStyle;
+  assistantWorkingPrinciples.value = profile.workingPrinciples;
+  assistantProfileVersion.textContent = `버전 ${profile.version}`;
+  previewAssistantName.textContent = profile.name;
+  if (!body.classList.contains("overview-active")
+    && !body.classList.contains("inbox-active")
+    && !body.classList.contains("debug-active")) {
+    viewKicker.textContent = profile.name;
   }
 }
 
-function resetAssistantComposer() {
-  currentConversationId = "";
-  viewingArchived = false;
-  aiForm.hidden = false;
-  aiAssistantName.textContent = assistantName(currentAssistantSlot);
-  aiContextTitle.textContent = currentAssistantSlot === 1 ? "첫 메시지로 시작하세요" : "보조 비서를 설정하세요";
-  aiProviderBadge.hidden = true;
-  aiProviderControl.hidden = false;
-  aiResetContext.hidden = true;
-  aiReturnCurrent.hidden = true;
-  aiProvider.disabled = false;
-  refreshAiControls();
-  aiTranscript.replaceChildren(emptyAiTranscript());
-  aiStatus.textContent = currentAssistantSlot === 1 ? "주 비서 준비" : "보조 비서 추가";
-  finishAiRequest();
-}
-
-function applyConversationControls(conversation) {
-  aiProvider.value = conversation.provider;
-  aiProvider.disabled = true;
-  aiProviderControl.hidden = true;
-  refreshAiControls();
-  if ([...aiModel.options].some((option) => option.value === conversation.defaultModel)) {
-    aiModel.value = conversation.defaultModel;
-  }
-  if ([...aiReasoning.options].some((option) => option.value === conversation.defaultReasoningEffort)) {
-    aiReasoning.value = conversation.defaultReasoningEffort;
+async function saveAssistantProfile(event) {
+  event.preventDefault();
+  if (!window.confirm("이 구성을 앞으로의 비서 응답에 적용할까요? 시스템 보안과 승인 규칙은 변경되지 않습니다.")) return;
+  assistantProfileSubmit.disabled = true;
+  assistantProfileStatus.textContent = "비서 구성을 적용하는 중…";
+  try {
+    const result = await request("/api/assistant/profile", {
+      method: "PUT",
+      body: JSON.stringify({
+        confirmation: "UPDATE_ASSISTANT_PROFILE",
+        name: assistantProfileName.value,
+        ownerAddress: assistantOwnerAddress.value,
+        roleDescription: assistantRoleDescription.value,
+        communicationStyle: assistantCommunicationStyle.value,
+        workingPrinciples: assistantWorkingPrinciples.value,
+      }),
+    });
+    applyAssistantProfile(result.profile);
+    assistantProfileStatus.textContent = "새 비서 구성을 적용했습니다.";
+    showToast("비서 구성이 변경되었습니다.");
+  } catch (error) {
+    assistantProfileStatus.textContent = error.message;
+  } finally {
+    assistantProfileSubmit.disabled = false;
   }
 }
 
-function renderAssistantSwitcher() {
-  for (const button of aiAssistantSwitcher.querySelectorAll("[data-slot]")) {
-    const slot = Number(button.dataset.slot);
-    const conversation = aiConversations.find((item) => item.assistantSlot === slot);
-    const name = document.createElement("strong");
-    name.textContent = assistantName(slot);
-    const detail = document.createElement("span");
-    detail.textContent = conversation?.title === "새 대화"
-      ? "대화 준비"
-      : conversation?.title ?? (slot === 2 ? "추가하기" : "대화 준비");
-    button.replaceChildren(name, detail);
-    button.classList.toggle("active", slot === currentAssistantSlot && !viewingArchived);
-    button.setAttribute("aria-current", slot === currentAssistantSlot && !viewingArchived ? "true" : "false");
+function showResetConfirmation(modeName) {
+  const mode = resetModes[modeName];
+  if (!mode) return;
+  pendingResetMode = modeName;
+  confirmationTitle.textContent = mode.title;
+  confirmationDescription.textContent = mode.description;
+  confirmationSubmit.textContent = mode.actionLabel;
+  confirmationSubmit.disabled = false;
+  settingsStatus.textContent = "";
+  destructiveConfirmation.hidden = false;
+  confirmationSubmit.focus();
+}
+
+function hideResetConfirmation() {
+  pendingResetMode = "";
+  destructiveConfirmation.hidden = true;
+  confirmationSubmit.disabled = false;
+  settingsStatus.textContent = "";
+}
+
+async function performDataReset() {
+  const mode = resetModes[pendingResetMode];
+  if (!mode) return;
+  confirmationSubmit.disabled = true;
+  confirmationCancel.disabled = true;
+  settingsStatus.textContent = "삭제하는 중…";
+  try {
+    await request(mode.endpoint, {
+      method: "POST",
+      body: JSON.stringify({ confirmation: mode.confirmation }),
+    });
+    resetConversationUi();
+    if (pendingResetMode === "all") await loadAssistantSettings();
+    settingsDialog.close();
+    showToast(mode.success);
+  } catch (error) {
+    settingsStatus.textContent = error.message;
+    confirmationSubmit.disabled = false;
+  } finally {
+    confirmationCancel.disabled = false;
   }
 }
 
-function renderActiveConversationSummary() {
-  const conversation = activeAssistantConversation();
-  if (conversation && !viewingArchived) renderConversationHeader(conversation, false);
-}
-
-function renderConversationHeader(conversation, archived) {
-  aiAssistantName.textContent = archived
-    ? `${assistantName(conversation.assistantSlot)} · 이전 문맥`
-    : assistantName(conversation.assistantSlot);
-  aiContextTitle.textContent = conversation.title === "새 대화" ? "첫 메시지로 시작하세요" : conversation.title;
-  aiProviderBadge.textContent = conversation.provider;
-  aiProviderBadge.hidden = false;
-  aiResetContext.hidden = archived;
-  aiReturnCurrent.hidden = !archived;
-}
-
-function renderAiHistory() {
-  const history = aiArchivedConversations.filter(
-    (conversation) => conversation.assistantSlot === currentAssistantSlot,
-  );
-  aiHistory.hidden = history.length === 0;
-  aiHistoryCount.textContent = history.length ? `${history.length}` : "";
-  aiHistoryList.replaceChildren(...history.map((conversation) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "history-item";
-    button.dataset.conversationId = conversation.id;
-    const title = document.createElement("strong");
-    title.textContent = conversation.title;
-    const meta = document.createElement("span");
-    meta.textContent = `${conversation.provider} · ${formatShortDate(conversation.archivedAt)}`;
-    button.append(title, meta);
-    return button;
-  }));
-}
-
-function activeAssistantConversation() {
-  return aiConversations.find((conversation) => conversation.assistantSlot === currentAssistantSlot) ?? null;
-}
-
-function assistantName(slot) {
-  return slot === 1 ? "주 비서" : "보조 비서";
-}
-
-function formatShortDate(value) {
-  if (!value) return "";
-  return new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" }).format(new Date(value));
-}
-
-function refreshAiControls() {
-  const provider = aiProviderOptions.find((option) => option.id === aiProvider.value);
-  if (!provider) return;
-  replaceSelectOptions(aiModel, provider.models, aiModel.value);
-  replaceSelectOptions(aiReasoning, provider.reasoningEfforts, aiReasoning.value);
-}
-
-function replaceSelectOptions(select, options, preferredValue) {
-  select.replaceChildren(
-    ...options.map((option) => {
-      const node = document.createElement("option");
-      node.value = option.id;
-      node.textContent = option.label;
-      return node;
-    }),
-  );
-  if (options.some((option) => option.id === preferredValue)) select.value = preferredValue;
-}
-
-function connectToAiJob(jobId, assistantNode) {
-  activeEventSource?.close();
-  const source = new EventSource(`/api/ai/jobs/${encodeURIComponent(jobId)}/events`);
-  activeEventSource = source;
-  const body = assistantNode.querySelector("p");
-  const meta = assistantNode.querySelector("span");
-
-  source.addEventListener("snapshot", (event) => {
-    const data = JSON.parse(event.data);
-    body.textContent = data.message.content;
-    meta.textContent = formatStoredMeta(data.message);
-  });
-  source.addEventListener("delta", (event) => {
-    const data = JSON.parse(event.data);
-    body.textContent += data.delta;
-    assistantNode.scrollIntoView({ block: "nearest" });
-  });
-  source.addEventListener("status", (event) => {
-    const data = JSON.parse(event.data);
-    aiStatus.textContent = data.status === "running" ? "응답 받는 중…" : data.status;
-  });
-  source.addEventListener("completed", (event) => {
-    const data = JSON.parse(event.data);
-    body.textContent = data.message.content;
-    meta.textContent = formatStoredMeta(data.message, data.streamMode);
-    assistantNode.classList.remove("streaming");
-    aiStatus.textContent = data.streamMode === "buffered" ? "응답 완료 · 호환 모드" : "응답 완료";
-    source.close();
-    finishAiRequest();
-  });
-  source.addEventListener("failed", (event) => {
-    const data = JSON.parse(event.data);
-    assistantNode.classList.remove("streaming");
-    assistantNode.classList.add("error");
-    if (!body.textContent) body.textContent = data.error;
-    meta.textContent = data.error;
-    aiStatus.textContent = data.job.status === "cancelled" ? "요청 취소됨" : "요청 실패";
-    source.close();
-    finishAiRequest();
-  });
-  source.onerror = () => {
-    if (source.readyState === EventSource.CLOSED) return;
-    source.close();
-    aiStatus.textContent = "연결이 끊겨 기록을 다시 불러옵니다.";
-    setTimeout(() => void loadConversation(currentConversationId), 500);
-  };
-}
-
-function setAiBusy(busy) {
-  aiSubmit.disabled = busy;
-  for (const button of aiAssistantSwitcher.querySelectorAll("button")) button.disabled = busy;
-  aiResetContext.disabled = busy;
-  aiReturnCurrent.disabled = busy;
-  aiCancel.hidden = !busy;
-  aiCancel.disabled = false;
-}
-
-function finishAiRequest() {
+function resetConversationUi() {
   activeEventSource?.close();
   activeEventSource = null;
   activeJobId = "";
-  setAiBusy(false);
-  if (!aiForm.hidden) aiMessage.focus();
+  conversationId = "";
+  dynamicTranscript.replaceChildren();
+  aiProvider.disabled = false;
+  aiMessage.value = "";
+  resizeComposer();
+  setBusy(false);
+  aiStatus.textContent = "비서에게 자연어로 지시하세요";
+  conversationScroller.scrollTo({ top: 0 });
 }
 
-function renderAiMessages(messages) {
-  if (!messages.length) {
-    aiTranscript.replaceChildren(emptyAiTranscript());
-    return;
+function resizeComposer() {
+  aiMessage.style.height = "auto";
+  aiMessage.style.height = `${Math.min(aiMessage.scrollHeight, 128)}px`;
+}
+
+async function initializeAi() {
+  const [options, conversations] = await Promise.all([
+    request("/api/ai/options"),
+    request("/api/ai/conversations"),
+  ]);
+  providerOptions = options.providers;
+  replaceOptions(aiProvider, providerOptions, aiProvider.value);
+  refreshModelControls();
+
+  const conversation = conversations.conversations.find((item) => item.assistantSlot === 1);
+  if (conversation) {
+    conversationId = conversation.id;
+    applyConversation(conversation);
+    await loadConversation(conversation.id);
+  } else {
+    aiStatus.textContent = "비서에게 자연어로 지시하세요";
   }
-  aiTranscript.replaceChildren(...messages.map((message) => {
+  updateModelSummary();
+}
+
+async function loadConversation(id) {
+  const result = await request(`/api/ai/conversations/${encodeURIComponent(id)}`);
+  conversationId = result.conversation.id;
+  applyConversation(result.conversation);
+  renderMessages(result.messages);
+  const active = [...result.messages].reverse().find((message) => message.role === "assistant" && ["pending", "streaming"].includes(message.status));
+  if (active?.jobId) {
+    const node = dynamicTranscript.querySelector(`[data-message-id="${CSS.escape(active.id)}"]`);
+    if (node) {
+      setBusy(true);
+      activeJobId = active.jobId;
+      connectToJob(activeJobId, node);
+    }
+  }
+}
+
+function applyConversation(conversation) {
+  aiProvider.value = conversation.provider;
+  aiProvider.disabled = true;
+  refreshModelControls();
+  if ([...aiModel.options].some((option) => option.value === conversation.defaultModel)) aiModel.value = conversation.defaultModel;
+  if ([...aiReasoning.options].some((option) => option.value === conversation.defaultReasoningEffort)) aiReasoning.value = conversation.defaultReasoningEffort;
+  updateModelSummary();
+}
+
+function refreshModelControls() {
+  const provider = providerOptions.find((item) => item.id === aiProvider.value) ?? providerOptions[0];
+  if (!provider) return;
+  if (!aiProvider.value) aiProvider.value = provider.id;
+  replaceOptions(aiModel, provider.models, aiModel.value);
+  replaceOptions(aiReasoning, provider.reasoningEfforts, aiReasoning.value);
+}
+
+function replaceOptions(select, options, preferredValue) {
+  select.replaceChildren(...options.map((option) => {
+    const node = document.createElement("option");
+    node.value = option.id;
+    node.textContent = option.label;
+    return node;
+  }));
+  if (options.some((option) => option.id === preferredValue)) select.value = preferredValue;
+}
+
+function updateModelSummary() {
+  const providerLabel = aiProvider.selectedOptions[0]?.textContent ?? "AI";
+  const modelLabel = aiModel.selectedOptions[0]?.textContent ?? "기본 모델";
+  modelSummary.textContent = `${providerLabel} · ${modelLabel}`;
+}
+
+function renderMessages(messages) {
+  dynamicTranscript.replaceChildren(...messages.map((message) => {
     const role = message.status === "failed" || message.status === "cancelled" ? "error" : message.role;
     const fallback = message.status === "cancelled" ? "취소된 요청" : message.status === "failed" ? "완료되지 않은 요청" : "";
-    const node = buildAiMessage(role, message.content || fallback, formatStoredMeta(message));
+    const node = buildMessage(role, message.content || fallback, formatMeta(message));
     node.dataset.messageId = message.id;
     if (["pending", "streaming"].includes(message.status)) node.classList.add("streaming");
     return node;
   }));
-  aiTranscript.lastElementChild?.scrollIntoView({ block: "nearest" });
+  scrollConversationToBottom();
 }
 
-function appendAiMessage(role, text, meta = "", stateClass = "") {
-  aiTranscript.querySelector(".empty")?.remove();
-  const node = buildAiMessage(role, text, meta);
+function appendMessage(role, text, meta = "", stateClass = "") {
+  const node = buildMessage(role, text, meta);
   if (stateClass) node.classList.add(stateClass);
-  aiTranscript.append(node);
-  node.scrollIntoView({ block: "nearest" });
+  dynamicTranscript.append(node);
+  scrollConversationToBottom();
   return node;
 }
 
-function buildAiMessage(role, text, meta = "") {
-  const message = document.createElement("article");
-  message.className = `ai-message ${role}`;
-  const label = document.createElement("strong");
-  label.textContent = role === "user" ? "나" : role === "assistant" ? "AI" : "오류";
-  const body = document.createElement("p");
-  body.textContent = text;
-  const detail = document.createElement("span");
+function scrollConversationToBottom() {
+  requestAnimationFrame(() => {
+    conversationScroller.scrollTo({ top: conversationScroller.scrollHeight });
+  });
+}
+
+function buildMessage(role, text, meta = "") {
+  const article = document.createElement("article");
+  article.className = `turn message-turn ${role}-turn`;
+  if (role !== "user") {
+    const avatar = document.createElement("div");
+    avatar.className = "assistant-avatar";
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", "#icon-spark");
+    icon.append(use);
+    avatar.append(icon);
+    article.append(avatar);
+  }
+  const content = document.createElement("div");
+  content.className = "message-body";
+  const paragraph = document.createElement("p");
+  paragraph.textContent = text;
+  const detail = document.createElement("small");
   detail.textContent = meta;
-  message.append(label, body, detail);
-  return message;
+  content.append(paragraph, detail);
+  article.append(content);
+  return article;
 }
 
-function emptyAiTranscript() {
-  const empty = document.createElement("p");
-  empty.className = "empty";
-  empty.textContent = "메시지를 보내면 비서가 이 문맥을 이어갑니다.";
-  return empty;
+function connectToJob(jobId, assistantNode) {
+  activeEventSource?.close();
+  const source = new EventSource(`/api/ai/jobs/${encodeURIComponent(jobId)}/events`);
+  activeEventSource = source;
+  const paragraph = assistantNode.querySelector("p");
+  const detail = assistantNode.querySelector("small");
+
+  source.addEventListener("snapshot", (event) => {
+    const data = JSON.parse(event.data);
+    paragraph.textContent = data.message.content;
+    detail.textContent = formatMeta(data.message);
+  });
+  source.addEventListener("delta", (event) => {
+    const data = JSON.parse(event.data);
+    paragraph.textContent += data.delta;
+    scrollConversationToBottom();
+  });
+  source.addEventListener("status", (event) => {
+    const data = JSON.parse(event.data);
+    aiStatus.textContent = data.status === "running" ? "비서가 답변하는 중…" : data.status;
+  });
+  source.addEventListener("completed", (event) => {
+    const data = JSON.parse(event.data);
+    paragraph.textContent = data.message.content;
+    detail.textContent = formatMeta(data.message, data.streamMode);
+    assistantNode.classList.remove("streaming");
+    aiStatus.textContent = "응답 완료";
+    source.close();
+    finishRequest();
+    void refreshInboxCount();
+  });
+  source.addEventListener("failed", (event) => {
+    const data = JSON.parse(event.data);
+    assistantNode.classList.remove("streaming");
+    assistantNode.classList.add("error-turn");
+    if (!paragraph.textContent) paragraph.textContent = data.error;
+    detail.textContent = data.error;
+    aiStatus.textContent = data.job.status === "cancelled" ? "요청 취소됨" : "요청 실패";
+    source.close();
+    finishRequest();
+  });
+  source.onerror = () => {
+    if (source.readyState === EventSource.CLOSED) return;
+    source.close();
+    aiStatus.textContent = "연결을 복구하는 중…";
+    setTimeout(() => void loadConversation(conversationId), 500);
+  };
 }
 
-function formatStoredMeta(message, streamMode = "") {
+async function loadInbox() {
+  inboxStatus.hidden = false;
+  inboxStatus.textContent = "메모를 불러오는 중…";
+  inboxList.replaceChildren();
+  try {
+    const result = await request(`/api/inbox?status=${encodeURIComponent(activeInboxStatus)}`);
+    const items = activeInboxStatus === "confirmed" ? result.memos : result.proposals;
+    inboxCount.textContent = String(activeInboxStatus === "pending" ? items.length : Number(inboxCount.textContent || 0));
+    if (!items.length) {
+      inboxStatus.textContent = activeInboxStatus === "pending"
+        ? "확인을 기다리는 메모가 없습니다."
+        : activeInboxStatus === "confirmed"
+          ? "아직 저장된 비서 메모가 없습니다."
+          : "거절된 메모가 없습니다.";
+      return;
+    }
+    inboxStatus.hidden = true;
+    inboxList.replaceChildren(...items.map(buildInboxItem));
+  } catch (error) {
+    inboxStatus.textContent = error.message;
+  }
+}
+
+async function refreshInboxCount() {
+  try {
+    const result = await request("/api/inbox?status=pending");
+    inboxCount.textContent = String(result.proposals.length);
+  } catch {
+    inboxCount.textContent = "0";
+  }
+}
+
+function buildInboxItem(item) {
+  const article = document.createElement("article");
+  article.className = "inbox-item";
+  const heading = document.createElement("div");
+  heading.className = "inbox-item-heading";
+  const copy = document.createElement("div");
+  const label = document.createElement("small");
+  label.textContent = item.status === "pending" ? "확인 대기" : item.status === "rejected" ? "거절됨" : `저장됨 · 버전 ${item.currentVersion}`;
+  const title = document.createElement("h3");
+  title.textContent = item.memo.summary;
+  copy.append(label, title);
+  const time = document.createElement("time");
+  time.textContent = new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    .format(new Date(item.updatedAt || item.createdAt));
+  heading.append(copy, time);
+
+  const facets = document.createElement("div");
+  facets.className = "inbox-facets";
+  for (const facet of item.memo.facets) {
+    const row = document.createElement("p");
+    row.innerHTML = `<strong>${escapeHtml(facetLabel(facet.kind))}</strong><span>${escapeHtml(facet.text)}</span>`;
+    facets.append(row);
+  }
+
+  const source = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "원문 보기";
+  const quote = document.createElement("blockquote");
+  quote.textContent = item.rawText;
+  source.append(summary, quote);
+  article.append(heading, facets, source);
+  if (item.status === "pending") {
+    const hint = document.createElement("p");
+    hint.className = "inbox-confirm-hint";
+    hint.textContent = "비서 대화에서 ‘저장해’, ‘고쳐줘’, ‘저장하지 마’라고 말씀하세요.";
+    article.append(hint);
+  }
+  return article;
+}
+
+function facetLabel(kind) {
+  return ({ note: "메모", action: "행동", decision: "결정", knowledge: "지식", preference: "선호", open_question: "열린 질문" })[kind] || kind;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" })[character]);
+}
+
+async function loadDebug() {
+  debugStatus.hidden = false;
+  debugStatus.textContent = "SQLite 상태를 불러오는 중…";
+  debugTableWrap.hidden = true;
+  try {
+    const result = await request("/api/debug/summary");
+    const selected = debugDataset.value;
+    debugDataset.replaceChildren(...result.summary.datasets.map((dataset) => {
+      const option = document.createElement("option");
+      option.value = dataset.id;
+      option.textContent = `${dataset.label} (${dataset.count})`;
+      return option;
+    }));
+    if ([...debugDataset.options].some((option) => option.value === selected)) {
+      debugDataset.value = selected;
+    }
+    renderDebugSummary(result.summary);
+    await loadDebugDataset();
+  } catch (error) {
+    debugStatus.textContent = error.message;
+  }
+}
+
+async function loadDebugDataset() {
+  if (!debugDataset.value) return;
+  debugStatus.hidden = false;
+  debugStatus.textContent = "행 데이터를 불러오는 중…";
+  debugTableWrap.hidden = true;
+  try {
+    const result = await request(`/api/debug/data/${encodeURIComponent(debugDataset.value)}?limit=${encodeURIComponent(debugLimit.value)}`);
+    renderDebugTable(result.rows);
+  } catch (error) {
+    debugStatus.textContent = error.message;
+  }
+}
+
+function renderDebugSummary(summary) {
+  const total = summary.datasets.reduce((sum, dataset) => sum + dataset.count, 0);
+  const cards = [
+    { label: "전체 행", value: total },
+    { label: "확정 메모", value: summary.datasets.find((item) => item.id === "assistant_memos")?.count || 0 },
+    { label: "메모 제안", value: summary.datasets.find((item) => item.id === "intake_proposals")?.count || 0 },
+    { label: "AI 작업 상태", value: summary.activeAiJobs ? "처리 중" : "대기" },
+  ];
+  debugSummary.replaceChildren(...cards.map((card) => {
+    const article = document.createElement("article");
+    const strong = document.createElement("strong");
+    strong.textContent = String(card.value);
+    const span = document.createElement("span");
+    span.textContent = card.label;
+    article.append(strong, span);
+    return article;
+  }));
+}
+
+function renderDebugTable(rows) {
+  debugTableHead.replaceChildren();
+  debugTableBody.replaceChildren();
+  if (!rows.length) {
+    debugStatus.hidden = false;
+    debugStatus.textContent = "이 테이블에는 아직 데이터가 없습니다.";
+    return;
+  }
+  const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  const headerRow = document.createElement("tr");
+  for (const column of columns) {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = column;
+    headerRow.append(cell);
+  }
+  debugTableHead.append(headerRow);
+  for (const row of rows) {
+    const tableRow = document.createElement("tr");
+    for (const column of columns) {
+      const cell = document.createElement("td");
+      const value = row[column];
+      cell.textContent = value === null
+        ? "NULL"
+        : typeof value === "object"
+          ? JSON.stringify(value, null, 2)
+          : String(value ?? "");
+      tableRow.append(cell);
+    }
+    debugTableBody.append(tableRow);
+  }
+  debugStatus.hidden = true;
+  debugTableWrap.hidden = false;
+}
+
+function setBusy(busy) {
+  aiSubmit.disabled = busy;
+  aiCancel.hidden = !busy;
+  aiCancel.disabled = false;
+  newContext.disabled = busy;
+}
+
+function finishRequest() {
+  activeEventSource?.close();
+  activeEventSource = null;
+  activeJobId = "";
+  setBusy(false);
+  aiMessage.focus();
+}
+
+function formatMeta(message, streamMode = "") {
   const parts = [
     message.provider,
     message.model === "default" ? "기본 모델" : message.model,
     message.reasoningEffort === "default" ? "기본 추론" : message.reasoningEffort,
   ];
-  if (message.durationMs !== null) parts.push(`${(message.durationMs / 1000).toFixed(1)}초`);
-  if (message.inputTokens !== null) {
-    parts.push(`입력 ${message.inputTokens} · 출력 ${message.outputTokens ?? 0} 토큰`);
-  }
+  if (message.durationMs !== null && message.durationMs !== undefined) parts.push(`${(message.durationMs / 1000).toFixed(1)}초`);
   if (streamMode === "buffered") parts.push("호환 모드");
-  return parts.join(" · ");
-}
-
-function renderTasks(container, tasks, emptyMessage) {
-  if (!tasks.length) {
-    const empty = document.createElement("p");
-    empty.className = "empty";
-    empty.textContent = emptyMessage;
-    container.replaceChildren(empty);
-    return;
-  }
-  container.replaceChildren(...tasks.map(renderTask));
-}
-
-function renderTask(task) {
-  const node = taskTemplate.content.firstElementChild.cloneNode(true);
-  node.querySelector(".task-title").textContent = task.title;
-  node.querySelector(".task-meta").textContent = formatTaskMeta(task);
-  const dateInput = node.querySelector(".defer-date");
-  dateInput.value = task.scheduledOn || "";
-  node.querySelector(".defer").addEventListener("click", async () => {
-    if (!dateInput.value) return dateInput.focus();
-    await updateTask(task.id, { scheduledOn: dateInput.value });
-  });
-  node.querySelector(".complete").addEventListener("click", async () => {
-    await updateTask(task.id, { completed: true });
-  });
-  return node;
-}
-
-async function updateTask(id, patch) {
-  await request(`/api/tasks/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
-  await refreshTasks();
-}
-
-function formatTaskMeta(task) {
-  const parts = [];
-  if (task.scheduledOn) parts.push(`계획 ${task.scheduledOn}`);
-  if (task.dueOn) parts.push(`마감 ${task.dueOn}`);
-  return parts.join(" · ") || "날짜 없음";
+  return parts.filter(Boolean).join(" · ");
 }
 
 function createClientRequestId() {
-  if (typeof globalThis.crypto?.randomUUID === "function") {
-    return globalThis.crypto.randomUUID();
-  }
-
+  if (typeof globalThis.crypto?.randomUUID === "function") return globalThis.crypto.randomUUID();
   const bytes = new Uint8Array(16);
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let index = 0; index < bytes.length; index += 1) {
-      bytes[index] = Math.floor(Math.random() * 256);
-    }
-  }
+  if (typeof globalThis.crypto?.getRandomValues === "function") globalThis.crypto.getRandomValues(bytes);
+  else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
   const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
   return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }
@@ -562,17 +815,14 @@ function createClientRequestId() {
 async function request(url, init = {}) {
   const headers = { ...(init.headers || {}) };
   if (init.body !== undefined) headers["content-type"] = "application/json";
-  const response = await fetch(url, {
-    ...init,
-    headers,
-  });
+  const response = await fetch(url, { ...init, headers });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || `요청 실패 (${response.status})`);
   return data;
 }
 
-refreshAll().catch((error) => {
-  todayList.textContent = error.message;
-  openList.textContent = error.message;
+initializeAi().catch((error) => {
   aiStatus.textContent = error.message;
 });
+void loadAssistantSettings();
+void refreshInboxCount();

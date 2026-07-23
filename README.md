@@ -8,15 +8,19 @@ AI is required for intelligent operation. Inference uses only official locally i
 
 ## Refoundation status
 
-The repository currently contains a working technical prototype built around Capture, Tasks, and durable read-only AI conversations. Its infrastructure is being refounded into the executive-office product described in [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
+The repository contains an accepted responsive chief-assistant shell plus a working technical foundation built around SQLite and durable AI conversations. Conversational capture now proposes one integrated assistant memo from incomplete natural language, confirms it through dialogue, and exposes pending or saved material in Inbox. The target product is summarized in [PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) and defined in detail by [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
 
 Reusable foundation:
 
 - Fastify on localhost and private Tailscale access;
 - Node's built-in SQLite;
 - durable Codex and Grok CLI jobs;
+- an application-managed AI runtime outside the development repository;
+- a versioned owner-configured chief-assistant profile;
 - streaming, cancellation, concurrency limits, and restart recovery;
-- a dependency-light browser UI and Playwright verification.
+- a responsive desktop, Galaxy Tab, and smartphone UI;
+- an in-product project overview of the product constitution;
+- Playwright verification and development data-reset controls.
 
 Not yet implemented:
 
@@ -26,7 +30,7 @@ Not yet implemented:
 - typed agent mutations, receipts, corrections, and undo;
 - proactive scheduled assistant work.
 
-See [CURRENT_STATE.md](docs/CURRENT_STATE.md) and [ASSISTANT_SYSTEM_REFOUNDATION.md](docs/ASSISTANT_SYSTEM_REFOUNDATION.md) before selecting implementation work.
+See [PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md), [CURRENT_STATE.md](docs/CURRENT_STATE.md), and [ASSISTANT_SYSTEM_REFOUNDATION.md](docs/ASSISTANT_SYSTEM_REFOUNDATION.md) before selecting implementation work.
 
 ## Quick start
 
@@ -44,6 +48,8 @@ npm run dev
 ```
 
 Open <http://127.0.0.1:4310> locally. Live development servers must also verify tailnet-only Tailscale Serve as described in `AGENTS.md`.
+
+By default, the server creates separate managed AI runtime directories for development and production in the operating system's application-data area. `OPS_AI_WORKING_DIR` remains an operator-only override for an absolute directory outside Git repositories and inherited `AGENTS.md` instructions.
 
 ## Verification
 

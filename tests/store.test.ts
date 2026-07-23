@@ -138,6 +138,116 @@ test("AI assistants are limited to two active slots and reset without deleting h
   }
 });
 
+test("AI history can be cleared without deleting other application data", () => {
+  const store = new OpsStore(":memory:");
+  try {
+    store.createCapture("keep capture");
+    store.createTask({ title: "keep task", scheduledOn: null, dueOn: null });
+    store.createAiConversation({
+      provider: "codex",
+      model: "default",
+      reasoningEffort: "default",
+    });
+
+    assert.deepEqual(store.clearAiHistory(), { conversations: 1, messages: 0, jobs: 0 });
+    assert.equal(store.listAiConversations().length, 0);
+    assert.equal(store.listCaptures().length, 1);
+    assert.equal(store.listOpenTasks().length, 1);
+  } finally {
+    store.close();
+  }
+});
+
+test("all application data can be reset atomically when no AI job is active", () => {
+  const store = new OpsStore(":memory:");
+  try {
+    store.createCapture("delete capture");
+    store.createTask({ title: "delete task", scheduledOn: null, dueOn: null });
+    store.createAiConversation({
+      provider: "grok",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    store.updateAssistantProfile({
+      name: "temporary assistant",
+      ownerAddress: "owner",
+      roleDescription: "temporary role",
+      communicationStyle: "temporary style",
+      workingPrinciples: "temporary principle",
+    });
+
+    assert.deepEqual(store.resetAllData(), {
+      captures: 1,
+      tasks: 1,
+      assistantProfileVersions: 2,
+      intakeProposals: 0,
+      assistantMemos: 0,
+      assistantMemoVersions: 0,
+      conversations: 1,
+      messages: 0,
+      jobs: 0,
+    });
+    assert.equal(store.listCaptures().length, 0);
+    assert.equal(store.listOpenTasks().length, 0);
+    assert.equal(store.listAiConversations().length, 0);
+    assert.equal(store.getAssistantProfile().version, 1);
+    assert.equal(store.getAssistantProfile().name, "주 비서");
+  } finally {
+    store.close();
+  }
+});
+
+test("assistant profile changes are versioned and survive chat-history deletion", () => {
+  const store = new OpsStore(":memory:");
+  try {
+    const initial = store.getAssistantProfile();
+    const updated = store.updateAssistantProfile({
+      name: "지안",
+      ownerAddress: "대표님",
+      roleDescription: "개인 운영을 총괄한다.",
+      communicationStyle: "짧고 직접적으로 말한다.",
+      workingPrinciples: "허점을 발견하면 지적한다.",
+    });
+    store.createAiConversation({
+      provider: "grok",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    store.clearAiHistory();
+
+    assert.equal(updated.version, initial.version + 1);
+    assert.equal(store.getAssistantProfile().name, "지안");
+    assert.equal(store.debugDataset("assistant_profile_versions").length, 2);
+  } finally {
+    store.close();
+  }
+});
+
+test("data deletion is rejected while an AI job is queued", () => {
+  const store = new OpsStore(":memory:");
+  try {
+    const conversation = store.createAiConversation({
+      provider: "codex",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    store.createAiTurn({
+      conversationId: conversation.id,
+      clientRequestId: "44444444-4444-4444-8444-444444444444",
+      message: "queued request",
+      model: "default",
+      reasoningEffort: "default",
+    });
+
+    assert.equal(store.hasActiveAiJobs(), true);
+    assert.throws(() => store.clearAiHistory(), /active AI jobs/);
+    assert.throws(() => store.resetAllData(), /active AI jobs/);
+    assert.equal(store.listAiConversations().length, 1);
+  } finally {
+    store.close();
+  }
+});
+
 test("AI jobs follow durable terminal transitions", () => {
   const store = new OpsStore(":memory:");
   try {

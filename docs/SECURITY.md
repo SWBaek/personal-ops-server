@@ -67,10 +67,13 @@ Proactive agents remain in Observe unless a specific pre-authorized automation c
 - Invoke only official locally installed subscription-authenticated `codex` and `grok` CLIs.
 - Spawn binaries directly with `shell: false` and fixed command shapes.
 - Never accept a browser-provided executable, flag list, working directory, shell command, SQL statement, or filesystem path.
+- Run provider CLIs from a server-managed directory outside Git projects and inherited `AGENTS.md` files. Allow an operator-only `.env` path override only after the same isolation validation.
+- Treat the owner-editable assistant profile as subordinate preferences. It cannot override system security, authority, tools, validation, storage, or approval rules, and profile changes require a separate visible confirmation.
 - Keep provider credentials and session files outside application storage and prompts.
 - Give roles allowlisted application-domain tools rather than general shell or filesystem access.
 - Bound context by goal, role, source scope, and token budget.
 - Treat provider reasoning, hidden traces, and raw diagnostics as non-displayable internal data.
+- Keep development debugging read-only and dataset-allowlisted. It may expose application-owned conversation and memo rows, but never arbitrary SQL, provider thread identifiers, client request keys, database paths, credentials, or SQLite metadata outside the allowlist.
 
 ### Data and provenance
 
@@ -86,6 +89,7 @@ Proactive agents remain in Observe unless a specific pre-authorized automation c
 - Enforce domain invariants, authority, current-state preconditions, and idempotency deterministically.
 - Serialize conflicting writes.
 - Separate proposal and apply phases for Govern operations.
+- Require a separate final confirmation step for development data deletion, reject it while AI jobs are active, and limit it to explicitly enumerated application-owned tables in one transaction.
 - Store a receipt with actor/role, request, affected objects, before/after summary, evidence references, and undo information.
 - Fail closed when intent, target, authority, source, or current state is ambiguous.
 - Reconcile jobs after restart without blindly retrying a mutation whose outcome is uncertain.

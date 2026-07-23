@@ -179,6 +179,7 @@ Outcome: the owner can ask one bounded question and receive an answer grounded i
 Scope:
 
 - replace slot selection with a chief-assistant identity in the main interaction;
+- inject the versioned owner profile beneath immutable role, authority, and security policy;
 - resolve an explicit project/topic and retrieve a bounded context package;
 - run the selected official CLI with read-only role instructions;
 - distinguish current state, source evidence, inference, and unknowns;

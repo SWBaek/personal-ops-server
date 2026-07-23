@@ -8,6 +8,24 @@ Each decision is marked **Active**, **Superseded**, or **Transitional**. Superse
 
 The application lives in an independent public repository outside the legacy personal vault. This isolates application code, runtime data, secrets, and release history from personal source material.
 
+## 2026-07-22 — Establish the responsive assistant shell before feature expansion
+
+**Status: Active**
+
+The first product-facing design artifact is a responsive chief-assistant workspace rather than a backend-driven collection of forms. The owner accepted this initial shell as the baseline information architecture. Desktop browsers, the owner's Galaxy Tab, and smartphone browsers are equally required targets. They share the same essential workflows while adapting composition: persistent navigation and operational context on wide screens, a context drawer on narrower tablets, and a single-column conversation with bottom navigation on phones.
+
+The chief-assistant conversation is the visual center. Projects, schedule, knowledge, inbox, proposals, evidence, and receipts are supporting inspection and control surfaces. Prototype content must be visibly marked as example data until it is backed by canonical application state.
+
+The navigation includes a user-facing Project Overview that summarizes the product constitution, professional-assistant model, AI contract, boundaries, and roadmap. It is a product reference surface, not an operational project record, and must remain consistent with `docs/PRODUCT_OVERVIEW.md` and the deeper architecture and security documents.
+
+## 2026-07-22 — Provide explicit development data reset boundaries
+
+**Status: Active, development-stage control**
+
+The owner may clear all AI conversation history or reset all current application data from the settings UI. Both are destructive Govern operations: they require a separate final confirmation step, reject deletion while an AI job is queued or running, and execute as a database transaction. Typed confirmation is deferred while rapid development resets are frequent.
+
+Conversation clearing affects only assistant conversations, messages, and job records. Full reset additionally clears current capture and task records. Neither operation touches CLI authentication, environment configuration, Tailscale configuration, source files, or data outside the application-owned SQLite schema. The reset implementation must be updated explicitly when new canonical tables are introduced.
+
 ## 2026-07-22 — Keep legacy WorkOS optional and independent
 
 **Status: Active, clarified by the refoundation**
@@ -62,6 +80,18 @@ Agents return schema-constrained domain operations. The application validates au
 
 Every committed agent mutation produces a receipt and bounded undo path. Destructive, bulk, external, financial, migration, and policy-changing work uses a separate proposal and approval phase. Models never write SQLite or canonical files directly.
 
+## 2026-07-23 — Conversational confirmation before durable capture
+
+Every owner turn passes through a structured chief-assistant interpretation, but only turns with durable information produce one integrated memo proposal. The owner confirms, corrects, or rejects that proposal through natural language rather than form controls. A confirmed memo preserves the original wording, structured facets, uncertainty, and immutable revision history independently of conversation history.
+
+This milestone does not create project, schedule, task, decision, or knowledge-domain records. It establishes the interpretation and confirmation boundary those later typed mutations will reuse.
+
+## 2026-07-23 — Allowlisted read-only database debugging
+
+Development needs an inspectable path from natural-language conversation to SQLite state. The browser Debug view may read only fixed application datasets selected by server code. It does not accept SQL, table names outside the allowlist, filesystem paths, or mutation commands.
+
+Conversation content, proposals, and memo data are visible because they are the object of debugging. CLI credentials, provider thread identifiers, client request keys, database paths, and arbitrary SQLite metadata remain excluded from browser responses.
+
 ## 2026-07-22 — Private remote access
 
 **Status: Active**
@@ -113,3 +143,19 @@ The compact two-slot UI was preferable to unlimited consumer-chat history for th
 Useful reference patterns include a shared core across interaction surfaces, bounded curated memory, skills as procedural context, durable scheduling, isolated delegation, checkpoints, shared memory, evidence-aware state, and governed tools.
 
 The project will not adopt an external runtime wholesale because the product needs an application-specific operational ledger, official CLI-only inference, narrow domain tools, and stricter control over personal evidence. Generic host-terminal access, API-provider assumptions, per-profile data silos, and early self-modifying skills conflict with current boundaries.
+
+## 2026-07-23 — Managed AI runtime outside development repositories
+
+**Status: Active**
+
+Development and production use separate application-managed AI runtime directories in the operating system's application-data area. Automated tests use isolated test runtime directories. A machine owner may override the path through untracked environment configuration, but the server rejects a runtime inside a Git project or beneath an inherited `AGENTS.md`.
+
+Codex parent-project discovery is disabled as defense in depth. This prevents Codex and Grok from treating repository engineering guidance as product-assistant policy while keeping `npm run dev` as the complete developer startup workflow.
+
+## 2026-07-23 — Versioned owner-configured chief-assistant profile
+
+**Status: Active**
+
+The owner may configure the chief assistant's name, form of address, role emphasis, communication style, and working principles. Changes are explicit, confirmed, versioned in SQLite, survive chat-history deletion, and reset to the product default during a full development data reset.
+
+The profile is injected beneath immutable system policy. It cannot change authority, security, tool scope, validation, canonical storage, or approval rules. Product roles and provider adapters remain independent of the profile.

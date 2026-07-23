@@ -10,7 +10,7 @@ The product is AI-dependent by design. If no supported AI CLI is available, inte
 
 The human should not have to choose storage locations, maintain schemas, select an agent for every request, or reconcile parallel task lists.
 
-Read `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CURRENT_STATE.md`, and `docs/ASSISTANT_SYSTEM_REFOUNDATION.md` before broad implementation work.
+Read `docs/PRODUCT_OVERVIEW.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CURRENT_STATE.md`, and `docs/ASSISTANT_SYSTEM_REFOUNDATION.md` before broad implementation work.
 
 ## Product model
 
@@ -68,6 +68,8 @@ Proactive agents may create recommendations and proposals. They must not silentl
 
 ## AI runtime rules
 
+- Run web-triggered Codex and Grok processes from an application-managed runtime directory outside every Git repository. Development, production, and tests use separate runtime namespaces. `OPS_AI_WORKING_DIR` is an operator-only `.env` override and must be rejected when it inherits a Git root or `AGENTS.md`.
+- Disable Codex parent-project discovery as defense in depth. The product assistant must never inherit this repository's developer `AGENTS.md`; its role comes from fixed application policy plus the versioned owner profile.
 - Keep provider-specific behavior behind adapters.
 - Spawn CLIs with argument arrays and `shell: false`; never interpolate user input into a shell command.
 - Preserve durable job state, cancellation, timeouts, bounded output, restart recovery, and provider concurrency limits.
@@ -85,6 +87,7 @@ Proactive agents may create recommendations and proposals. They must not silentl
 - Use deterministic code for schema validation, authorization, idempotency, scheduling, indexing, backup, and invariant enforcement. AI supplies interpretation and judgment, not transactional correctness.
 - Serialize conflicting mutations and make retries idempotent.
 - Validate every input at the server boundary and every agent-generated intent before commit.
+- When adding an application-owned data table, explicitly classify it for development reset behavior and update reset tests. Reset operations must remain transactional, reject active AI work, and never touch CLI credentials, environment configuration, Tailscale state, source files, or external data.
 - Preserve provenance from facts, decisions, actions, and knowledge back to evidence where material.
 - Keep secrets out of the repository, logs, browser responses, prompts, fixtures, and screenshots.
 - Put machine-specific settings such as ports, local paths, and private-network hostnames in the untracked `.env` file. Commit only safe placeholders in `.env.example`; never commit `.env` or any `.env.*` variant other than `.env.example`.
@@ -105,18 +108,22 @@ Proactive agents may create recommendations and proposals. They must not silentl
 
 - Before claiming that browser automation or screenshot verification is unavailable, inspect the repository for Playwright and check whether its Chromium runtime is installed. This project has a working project-native Playwright path and does not require an in-app browser or the owner's Chrome profile for local UI verification.
 - Use the isolated project Playwright environment for localhost and tailnet UI workflows. Use the owner's normal Chrome profile or an installed browser extension only when the owner explicitly asks for existing signed-in browser state.
-- Treat the Galaxy Tab over Tailscale as a required compatibility target. The tailnet page may be served in a context where optional browser APIs are missing even when desktop localhost supports them.
+- Treat PC web browsers, the owner's Galaxy Tab, and smartphone web browsers as first-class required targets. A workflow is incomplete if it works on only one of these device classes.
+- Test changed primary workflows at representative desktop, Galaxy Tab, and smartphone viewports. Critical actions must not depend on hover, right-click, a hardware keyboard, or a wide viewport, and core screens must not require horizontal page scrolling.
+- Test remote interaction through the actual Tailscale-served URL when changing responsive layout, browser-only APIs, streaming, or remote interaction. The tailnet page may be served in a context where optional browser APIs are missing even when desktop localhost supports them.
 - Feature-detect optional Web APIs and provide tested fallbacks when practical. In particular, never call `crypto.randomUUID` without a compatibility path.
-- Test at the relevant tablet viewport and through the actual Tailscale-served URL when changing responsive layout, browser-only APIs, streaming, or remote interaction.
 - Starting or restarting the live application is incomplete until Tailscale Serve is also running and both endpoints are verified. Confirm more than HTTP 200: check the health response and verify that the served page contains a marker from the current build.
 
 ## Interface principles
 
+- Treat interaction design and responsive information architecture as early product work, before broad feature expansion. Validate the main flows in low-cost prototypes before allowing backend structure to dictate the UI.
+- Keep the same essential capabilities across desktop, tablet, and phone, while adapting composition to the available space: multi-pane where useful, progressively disclosed or single-column flows where necessary.
 - Present one primary assistant conversation, not an unlimited consumer-chat session list.
 - Make the current subject, evidence used, proposed changes, progress, and completed receipts inspectable.
 - Prefer concise operational summaries over raw agent traces.
 - Allow direct specialist access as an advanced shortcut, not a required navigation step.
 - Keep model and reasoning controls secondary to the job being done.
+- Let the owner configure the chief assistant's name, form of address, role emphasis, communication style, and working principles. Keep security, authority, validation, storage, and tool policy outside that editable profile.
 - Do not turn every fact into a task, every conversation into a permanent artifact, or every role into a separate UI panel.
 
 ## Commands

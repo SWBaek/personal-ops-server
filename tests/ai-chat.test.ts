@@ -38,6 +38,7 @@ test("provider invocations use fixed command shapes", () => {
   assert.equal(codex.stdin, codexInput.message);
   assert.equal(codex.args.includes(codexInput.message), false);
   assert.deepEqual(codex.args.slice(0, 4), ["exec", "--json", "--sandbox", "read-only"]);
+  assert.equal(codex.args.includes("project_root_markers=[]"), true);
 
   const grok = buildProviderInvocation(
     { ...codexInput, provider: "grok", model: "grok-4.5", reasoningEffort: "low" },
