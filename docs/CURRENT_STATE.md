@@ -19,6 +19,7 @@ The running application now presents the accepted baseline information architect
 - Private remote access through Tailscale Serve.
 - Durable Codex and Grok conversations through official locally installed subscription-authenticated CLIs.
 - Allowlisted provider, model, and reasoning controls.
+- Explicit provider switching that archives the current provider-native context and starts a clean context in the same chief-assistant slot.
 - SQLite-backed conversations, messages, idempotent jobs, sanitized SSE, cancellation, and restart recovery.
 - Codex app-server text deltas over private stdio with buffered `codex exec` fallback; Grok streaming JSON.
 - Environment-separated managed AI runtime outside Git repositories, Codex parent-project discovery disabled, provider concurrency locks, two-minute timeout, and bounded output.
@@ -66,7 +67,7 @@ Do not expand these transitional behaviors as if they were the target architectu
 The last implementation verification on Windows with Node.js 24.18.0 passed on 2026-07-23:
 
 - `npm run verify`;
-- 38 unit/integration tests and 15 Playwright tests;
+- 38 unit/integration tests and 16 Playwright tests;
 - TypeScript production build;
 - `npm audit --audit-level=moderate` with zero reported vulnerabilities;
 - local health endpoint and tailnet-served page;

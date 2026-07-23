@@ -51,6 +51,12 @@ interface CreateAiMessageBody {
   reasoningEffort?: unknown;
 }
 
+interface ResetAiConversationBody {
+  provider?: unknown;
+  model?: unknown;
+  reasoningEffort?: unknown;
+}
+
 interface ConfirmDestructiveBody {
   confirmation?: unknown;
 }
@@ -265,12 +271,19 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     };
   });
 
-  app.post<{ Params: { id: string } }>(
+  app.post<{ Params: { id: string }; Body: ResetAiConversationBody }>(
     "/api/ai/conversations/:id/reset",
     async (request, reply) => {
       requireAiConversationService(options.aiConversationService);
+      const current = options.store.getActiveAiConversation(request.params.id);
+      if (!current) return reply.code(404).send({ error: "활성 비서를 찾을 수 없습니다." });
+      const selection = validateAiSelection({
+        provider: request.body?.provider ?? current.provider,
+        model: request.body?.model ?? current.defaultModel,
+        reasoningEffort: request.body?.reasoningEffort ?? current.defaultReasoningEffort,
+      });
       try {
-        const conversation = options.store.resetAiConversation(request.params.id);
+        const conversation = options.store.resetAiConversation(request.params.id, selection);
         return reply.code(201).send({ conversation: publicConversation(conversation) });
       } catch (error) {
         if (error instanceof Error && error.message.includes("active request")) {

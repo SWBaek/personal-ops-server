@@ -128,6 +128,8 @@ CLI development uses Playwright with an isolated Chromium runtime for repeatable
 
 Conversations, messages, and jobs are stored in SQLite. Requests use unique client IDs, provider concurrency controls, explicit job states, cancellation, bounded output, and restart reconciliation. Only sanitized assistant text and state cross the SSE boundary.
 
+Changing providers is an explicit context boundary. The current conversation is archived and remains inspectable, while a replacement conversation starts in the same assistant slot with the selected provider, model, and reasoning level. This prevents a Codex thread identifier from being reused with Grok (or vice versa) and makes the loss of provider-native context visible to the owner.
+
 The refoundation will retain this infrastructure while adding role invocation, context packages, proposals, approvals, receipts, and scheduled goals.
 
 ## 2026-07-22 — One or two durable assistant slots

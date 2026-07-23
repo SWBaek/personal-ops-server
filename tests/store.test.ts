@@ -127,9 +127,17 @@ test("AI assistants are limited to two active slots and reset without deleting h
       reasoningEffort: "default",
     }), /limit reached/);
 
-    const replacement = store.resetAiConversation(primary.id);
+    const replacement = store.resetAiConversation(primary.id, {
+      provider: "grok",
+      model: "grok-4.5",
+      reasoningEffort: "high",
+    });
     assert.equal(replacement.assistantSlot, 1);
     assert.notEqual(replacement.id, primary.id);
+    assert.equal(replacement.provider, "grok");
+    assert.equal(replacement.defaultModel, "grok-4.5");
+    assert.equal(replacement.defaultReasoningEffort, "high");
+    assert.equal(replacement.providerThreadId, null);
     assert.equal(store.getActiveAiConversation(primary.id), null);
     assert.equal(store.getAiConversation(primary.id)?.archivedAt === null, false);
     assert.deepEqual(store.listArchivedAiConversations().map((item) => item.id), [primary.id]);

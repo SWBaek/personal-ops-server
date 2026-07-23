@@ -61,6 +61,7 @@ const previewAssistantName = document.querySelector("#preview-assistant-name");
 
 let providerOptions = [];
 let conversationId = "";
+let conversationProvider = "";
 let activeJobId = "";
 let activeEventSource = null;
 let toastTimer = null;
@@ -168,10 +169,7 @@ aiMessage.addEventListener("keydown", (event) => {
   }
 });
 
-aiProvider.addEventListener("change", () => {
-  refreshModelControls();
-  updateModelSummary();
-});
+aiProvider.addEventListener("change", () => void changeAiProvider());
 aiModel.addEventListener("change", updateModelSummary);
 aiReasoning.addEventListener("change", updateModelSummary);
 
@@ -423,8 +421,8 @@ function resetConversationUi() {
   activeEventSource = null;
   activeJobId = "";
   conversationId = "";
+  conversationProvider = "";
   dynamicTranscript.replaceChildren();
-  aiProvider.disabled = false;
   aiMessage.value = "";
   resizeComposer();
   setBusy(false);
@@ -474,11 +472,69 @@ async function loadConversation(id) {
 }
 
 function applyConversation(conversation) {
+  conversationProvider = conversation.provider;
   aiProvider.value = conversation.provider;
-  aiProvider.disabled = true;
   refreshModelControls();
   if ([...aiModel.options].some((option) => option.value === conversation.defaultModel)) aiModel.value = conversation.defaultModel;
   if ([...aiReasoning.options].some((option) => option.value === conversation.defaultReasoningEffort)) aiReasoning.value = conversation.defaultReasoningEffort;
+  updateModelSummary();
+}
+
+async function changeAiProvider() {
+  const requestedProvider = aiProvider.value;
+  const previousProvider = conversationProvider;
+  refreshModelControls();
+  updateModelSummary();
+
+  if (!conversationId || !previousProvider || requestedProvider === previousProvider) return;
+  if (activeJobId) {
+    restoreProviderSelection(previousProvider);
+    aiStatus.textContent = "응답이 끝난 뒤 제공자를 변경해주세요";
+    return;
+  }
+
+  const providerLabel = aiProvider.selectedOptions[0]?.textContent ?? requestedProvider;
+  if (!window.confirm(`${providerLabel}(으)로 전환할까요? 현재 대화는 보관하고 새 AI 문맥을 시작합니다.`)) {
+    restoreProviderSelection(previousProvider);
+    return;
+  }
+
+  const model = aiModel.value;
+  const reasoningEffort = aiReasoning.value;
+  aiProvider.disabled = true;
+  aiModel.disabled = true;
+  aiReasoning.disabled = true;
+  newContext.disabled = true;
+  aiStatus.textContent = `${providerLabel}(으)로 전환하는 중…`;
+  try {
+    const result = await request(`/api/ai/conversations/${encodeURIComponent(conversationId)}/reset`, {
+      method: "POST",
+      body: JSON.stringify({
+        provider: requestedProvider,
+        model,
+        reasoningEffort,
+      }),
+    });
+    conversationId = result.conversation.id;
+    dynamicTranscript.replaceChildren();
+    applyConversation(result.conversation);
+    modelMenu.open = false;
+    aiStatus.textContent = `${providerLabel}(으)로 전환했습니다`;
+    aiMessage.focus();
+  } catch (error) {
+    restoreProviderSelection(previousProvider);
+    aiStatus.textContent = error.message;
+  } finally {
+    aiProvider.disabled = false;
+    aiModel.disabled = false;
+    aiReasoning.disabled = false;
+    newContext.disabled = false;
+  }
+}
+
+function restoreProviderSelection(provider) {
+  aiProvider.value = provider;
+  refreshModelControls();
   updateModelSummary();
 }
 
@@ -780,6 +836,9 @@ function setBusy(busy) {
   aiCancel.hidden = !busy;
   aiCancel.disabled = false;
   newContext.disabled = busy;
+  aiProvider.disabled = busy;
+  aiModel.disabled = busy;
+  aiReasoning.disabled = busy;
 }
 
 function finishRequest() {

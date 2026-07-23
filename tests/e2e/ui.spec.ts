@@ -169,6 +169,37 @@ test("structured AI response completes and the conversation survives a reload", 
   await expect(page.locator("#dynamic-transcript")).toContainText("구조화 응답 완료");
 });
 
+test("an existing Codex conversation can switch to Grok from the provider menu", async ({ page, request }) => {
+  await request.post("/api/ai/history/clear", {
+    data: { confirmation: "DELETE_AI_HISTORY" },
+  });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator("#ai-message").fill("Codex 문맥을 먼저 만듭니다");
+  await page.locator("#ai-submit").click();
+  await expect(page.locator("#ai-status")).toContainText("응답 완료");
+
+  await page.locator("#model-summary").click();
+  await expect(page.locator(".model-menu")).toHaveAttribute("open", "");
+  await expect(page.locator("#ai-provider")).toBeEnabled();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.locator("#ai-provider").selectOption("grok");
+
+  await expect(page.locator("#ai-provider")).toHaveValue("grok");
+  await expect(page.locator("#ai-status")).toContainText("Grok(으)로 전환했습니다");
+  await expect(page.locator("#dynamic-transcript")).toBeEmpty();
+
+  const conversations = await (await request.get("/api/ai/conversations")).json();
+  expect(conversations.conversations).toHaveLength(1);
+  expect(conversations.conversations[0].provider).toBe("grok");
+  expect(conversations.archivedConversations).toHaveLength(1);
+  expect(conversations.archivedConversations[0].provider).toBe("codex");
+
+  await page.locator("#ai-message").fill("Grok 전환 후 질문입니다");
+  await page.locator("#ai-submit").click();
+  await expect(page.locator(".message-turn.assistant-turn").last()).toContainText("구조화 응답 완료");
+  await expect(page.locator(".message-turn.assistant-turn").last()).toContainText("grok");
+});
+
 test("conversation proposes and confirms one durable assistant memo", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/", { waitUntil: "networkidle" });

@@ -274,6 +274,8 @@ export interface CreateAiConversationInput {
   reasoningEffort: string;
 }
 
+export type AiConversationSelection = Omit<CreateAiConversationInput, "assistantSlot">;
+
 export interface CreateAiTurnInput {
   conversationId: string;
   clientRequestId: string;
@@ -685,7 +687,7 @@ export class OpsStore {
     return conversation?.archivedAt === null ? conversation : null;
   }
 
-  resetAiConversation(id: string): AiConversation {
+  resetAiConversation(id: string, selection?: AiConversationSelection): AiConversation {
     const conversation = this.getActiveAiConversation(id);
     if (!conversation) throw new Error("AI assistant not found");
     const activeJob = this.#db.prepare(
@@ -702,9 +704,9 @@ export class OpsStore {
       ).run(timestamp, timestamp, id);
       const replacement = this.createAiConversation({
         assistantSlot: conversation.assistantSlot,
-        provider: conversation.provider,
-        model: conversation.defaultModel,
-        reasoningEffort: conversation.defaultReasoningEffort,
+        provider: selection?.provider ?? conversation.provider,
+        model: selection?.model ?? conversation.defaultModel,
+        reasoningEffort: selection?.reasoningEffort ?? conversation.defaultReasoningEffort,
       });
       this.#db.exec("COMMIT");
       return replacement;
