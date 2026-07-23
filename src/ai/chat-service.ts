@@ -88,6 +88,11 @@ export interface ProviderInvocation {
   stdin: string | null;
 }
 
+interface StructuredOutputOptions {
+  schemaPath: string;
+  schema: string;
+}
+
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 256 * 1024;
 const MAX_RESPONSE_LENGTH = 64 * 1024;
@@ -133,6 +138,17 @@ export class CliAiChatService implements AiChatService {
   }
 
   async chat(input: AiChatInput): Promise<AiChatResult> {
+    return this.#run(input);
+  }
+
+  async structuredChat(
+    input: AiChatInput,
+    output: StructuredOutputOptions,
+  ): Promise<AiChatResult> {
+    return this.#run(input, output);
+  }
+
+  async #run(input: AiChatInput, output?: StructuredOutputOptions): Promise<AiChatResult> {
     if (this.#activeProviders.has(input.provider)) {
       throw new AiChatError("The selected AI provider is already handling a request", 409);
     }
@@ -140,7 +156,7 @@ export class CliAiChatService implements AiChatService {
     this.#activeProviders.add(input.provider);
     const startedAt = performance.now();
     try {
-      const invocation = buildProviderInvocation(input, this.#workingDirectory);
+      const invocation = buildProviderInvocation(input, this.#workingDirectory, output);
       const stdout = await runInvocation(invocation, {
         workingDirectory: this.#workingDirectory,
         timeoutMs: this.#timeoutMs,
@@ -159,6 +175,7 @@ export class CliAiChatService implements AiChatService {
 export function buildProviderInvocation(
   input: AiChatInput,
   workingDirectory: string,
+  output?: StructuredOutputOptions,
 ): ProviderInvocation {
   if (input.provider === "codex") {
     const args = [
@@ -173,6 +190,8 @@ export function buildProviderInvocation(
       workingDirectory,
       "-c",
       'web_search="disabled"',
+      "-c",
+      "project_root_markers=[]",
       "--disable",
       "apps",
       "--disable",
@@ -186,6 +205,7 @@ export function buildProviderInvocation(
     if (input.reasoningEffort !== "default") {
       args.push("-c", `model_reasoning_effort="${input.reasoningEffort}"`);
     }
+    if (output) args.push("--output-schema", output.schemaPath);
     args.push("-");
     return { command: "codex", args, stdin: input.message };
   }
@@ -211,6 +231,7 @@ export function buildProviderInvocation(
   if (input.reasoningEffort !== "default") {
     args.push("--reasoning-effort", input.reasoningEffort);
   }
+  if (output) args.push("--json-schema", output.schema);
   args.push("--single", input.message);
   return { command: "grok", args, stdin: null };
 }

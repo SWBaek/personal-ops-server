@@ -83,7 +83,7 @@ Future roles require a documented need for different tools, context, evaluation,
 
 The context builder assembles a goal-specific package rather than exposing the whole personal corpus. Inputs may include:
 
-- the owner's bounded profile and preferences;
+- the owner's versioned chief-assistant profile and bounded preferences;
 - the named or inferred project, person, event, or knowledge topic;
 - current commitments, dependencies, risks, and decisions;
 - exact evidence excerpts and provenance;
@@ -153,7 +153,9 @@ Adapters call installed binaries only:
 
 Provider adapters expose capabilities, not product roles. The role runtime supplies instructions, context, tools, and schemas independently of the chosen provider.
 
-The current read-only runner uses a fixed empty working directory and no domain tools. During refoundation it will evolve into an application-tool loop; broad filesystem or shell access will remain unavailable to web-triggered assistant roles.
+The current read-only runner uses a stable application-managed runtime directory outside every Git repository and no domain tools. Development, production, and automated tests have separate runtime namespaces. Codex parent-project discovery is disabled as defense in depth; Grok and Codex therefore cannot inherit the development repository's `AGENTS.md`.
+
+The chief assistant's immutable policy and owner-editable profile are separate instruction layers. The owner may version the assistant's name, form of address, role emphasis, communication style, and working principles. Security, authority, tools, schema validation, canonical storage, and approval policy remain application-owned and cannot be changed by that profile.
 
 ### Durable work and scheduling
 

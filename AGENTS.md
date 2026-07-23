@@ -10,7 +10,7 @@ The product is AI-dependent by design. If no supported AI CLI is available, inte
 
 The human should not have to choose storage locations, maintain schemas, select an agent for every request, or reconcile parallel task lists.
 
-Read `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CURRENT_STATE.md`, and `docs/ASSISTANT_SYSTEM_REFOUNDATION.md` before broad implementation work.
+Read `docs/PRODUCT_OVERVIEW.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CURRENT_STATE.md`, and `docs/ASSISTANT_SYSTEM_REFOUNDATION.md` before broad implementation work.
 
 ## Product model
 
@@ -68,6 +68,8 @@ Proactive agents may create recommendations and proposals. They must not silentl
 
 ## AI runtime rules
 
+- Run web-triggered Codex and Grok processes from an application-managed runtime directory outside every Git repository. Development, production, and tests use separate runtime namespaces. `OPS_AI_WORKING_DIR` is an operator-only `.env` override and must be rejected when it inherits a Git root or `AGENTS.md`.
+- Disable Codex parent-project discovery as defense in depth. The product assistant must never inherit this repository's developer `AGENTS.md`; its role comes from fixed application policy plus the versioned owner profile.
 - Keep provider-specific behavior behind adapters.
 - Spawn CLIs with argument arrays and `shell: false`; never interpolate user input into a shell command.
 - Preserve durable job state, cancellation, timeouts, bounded output, restart recovery, and provider concurrency limits.
@@ -121,6 +123,7 @@ Proactive agents may create recommendations and proposals. They must not silentl
 - Prefer concise operational summaries over raw agent traces.
 - Allow direct specialist access as an advanced shortcut, not a required navigation step.
 - Keep model and reasoning controls secondary to the job being done.
+- Let the owner configure the chief assistant's name, form of address, role emphasis, communication style, and working principles. Keep security, authority, validation, storage, and tool policy outside that editable profile.
 - Do not turn every fact into a task, every conversation into a permanent artifact, or every role into a separate UI panel.
 
 ## Commands

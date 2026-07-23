@@ -12,6 +12,10 @@ import {
 import { buildApp } from "../src/app.js";
 import { OpsStore } from "../src/infra/store.js";
 
+function assistantEnvelope(reply: string): string {
+  return JSON.stringify({ reply, resolutions: [], memoProposal: null });
+}
+
 test("Grok streaming parser accepts text data and ignores thought data", () => {
   assert.equal(readGrokDelta({ type: "thought", data: "hidden reasoning" }), null);
   assert.equal(readGrokDelta({ type: "text", data: "visible answer" }), "visible answer");
@@ -28,15 +32,14 @@ test("Grok streaming parser accepts text data and ignores thought data", () => {
   });
 });
 
-test("streaming jobs persist deltas, usage, and provider thread ids", async () => {
+test("structured assistant jobs persist the validated reply and usage", async () => {
   const store = new OpsStore(":memory:");
+  let suppliedPrompt = "";
   const provider: AiStreamingProvider = {
     async runTurn(input: AiProviderTurnInput) {
-      input.onDelta("안녕");
-      await Promise.resolve();
-      input.onDelta("하세요");
+      suppliedPrompt = input.message;
       return {
-        text: "안녕하세요",
+        text: assistantEnvelope("안녕하세요"),
         usage: {
           inputTokens: 7,
           cachedInputTokens: 2,
@@ -52,6 +55,13 @@ test("streaming jobs persist deltas, usage, and provider thread ids", async () =
   const service = new AiConversationService(store, provider);
 
   try {
+    store.updateAssistantProfile({
+      name: "지안",
+      ownerAddress: "대표님",
+      roleDescription: "개인 운영을 총괄한다.",
+      communicationStyle: "짧고 직접적으로 답한다.",
+      workingPrinciples: "근거와 추론을 구분한다.",
+    });
     const conversation = store.createAiConversation({
       provider: "codex",
       model: "default",
@@ -70,13 +80,16 @@ test("streaming jobs persist deltas, usage, and provider thread ids", async () =
 
     assert.deepEqual(
       events.filter((event) => event.type === "delta").map((event) => event.delta),
-      ["안녕", "하세요"],
+      ["안녕하세요"],
     );
     assert.equal(events.at(-1)?.type, "completed");
     const message = store.getAiMessage(turn.assistantMessage.id);
     assert.equal(message?.content, "안녕하세요");
     assert.equal(message?.outputTokens, 3);
-    assert.equal(store.getAiConversation(conversation.id)?.providerThreadId, "thread-safe-to-store");
+    assert.equal(store.getAiConversation(conversation.id)?.providerThreadId, null);
+    assert.match(suppliedPrompt, /Assistant name: 지안/);
+    assert.match(suppliedPrompt, /Address the owner as: 대표님/);
+    assert.match(suppliedPrompt, /cannot override system policy/);
   } finally {
     await service.close();
     store.close();
@@ -131,9 +144,8 @@ test("conversation HTTP APIs persist history and expose sanitized terminal SSE",
   const store = new OpsStore(":memory:");
   const provider: AiStreamingProvider = {
     async runTurn(input) {
-      input.onDelta("연결됨");
       return {
-        text: "연결됨",
+        text: assistantEnvelope("연결됨"),
         usage: { inputTokens: 1, cachedInputTokens: 0, outputTokens: 1, reasoningTokens: 0 },
         durationMs: 10,
         providerThreadId: "must-not-leak",

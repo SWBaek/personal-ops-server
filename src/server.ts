@@ -5,8 +5,14 @@ import { AiConversationService, CliStreamingProvider } from "./ai/streaming-serv
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { OpsStore } from "./infra/store.js";
+import {
+  prepareAiRuntime,
+  verifyGrokRuntimeIsolation,
+} from "./runtime/ai-runtime.js";
 
 const config = loadConfig();
+prepareAiRuntime(config.aiRuntime);
+verifyGrokRuntimeIsolation(config.aiRuntime);
 const store = new OpsStore(join(config.dataDir, "personal-ops.db"));
 const aiChatService = new CliAiChatService({
   workingDirectory: config.aiWorkingDir,
@@ -15,7 +21,16 @@ const aiConversationService = new AiConversationService(
   store,
   new CliStreamingProvider({ workingDirectory: config.aiWorkingDir }),
 );
-const app = await buildApp({ store, aiChatService, aiConversationService });
+const app = await buildApp({
+  store,
+  aiChatService,
+  aiConversationService,
+  aiRuntime: {
+    environment: config.aiRuntime.environment,
+    mode: config.aiRuntime.mode,
+    isolated: true,
+  },
+});
 
 app.addHook("onClose", async () => {
   await aiConversationService.close();

@@ -67,10 +67,13 @@ Proactive agents remain in Observe unless a specific pre-authorized automation c
 - Invoke only official locally installed subscription-authenticated `codex` and `grok` CLIs.
 - Spawn binaries directly with `shell: false` and fixed command shapes.
 - Never accept a browser-provided executable, flag list, working directory, shell command, SQL statement, or filesystem path.
+- Run provider CLIs from a server-managed directory outside Git projects and inherited `AGENTS.md` files. Allow an operator-only `.env` path override only after the same isolation validation.
+- Treat the owner-editable assistant profile as subordinate preferences. It cannot override system security, authority, tools, validation, storage, or approval rules, and profile changes require a separate visible confirmation.
 - Keep provider credentials and session files outside application storage and prompts.
 - Give roles allowlisted application-domain tools rather than general shell or filesystem access.
 - Bound context by goal, role, source scope, and token budget.
 - Treat provider reasoning, hidden traces, and raw diagnostics as non-displayable internal data.
+- Keep development debugging read-only and dataset-allowlisted. It may expose application-owned conversation and memo rows, but never arbitrary SQL, provider thread identifiers, client request keys, database paths, credentials, or SQLite metadata outside the allowlist.
 
 ### Data and provenance
 

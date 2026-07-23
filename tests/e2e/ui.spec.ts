@@ -6,7 +6,7 @@ test("desktop presents the assistant between navigation and operational context"
 
   await expect(page.getByRole("heading", { name: "운영 브리핑" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "좋은 아침입니다." })).toBeVisible();
-  await expect(page.locator(".preview-label")).toHaveText("UI PREVIEW");
+  await expect(page.locator("#assistant-view .preview-label")).toHaveText("UI PREVIEW");
 
   const sidebar = await page.locator(".sidebar").boundingBox();
   const workspace = await page.locator(".workspace").boundingBox();
@@ -18,6 +18,25 @@ test("desktop presents the assistant between navigation and operational context"
   expect(context?.x ?? 0).toBeGreaterThan(workspace?.x ?? 0);
 
   await page.screenshot({ path: testInfo.outputPath("desktop-assistant-shell.png"), fullPage: true });
+});
+
+test("desktop project overview explains the product constitution", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator('.side-nav [data-view="프로젝트 개요"]').click();
+
+  await expect(page.locator("body")).toHaveClass(/overview-active/);
+  await expect(page.locator("#project-overview")).toBeVisible();
+  await expect(page.locator("#assistant-view")).toBeHidden();
+  await expect(page.locator("#assistant-composer")).toBeHidden();
+  await expect(page.getByRole("heading", { name: "개인 운영을 맡는 AI 전문 비서 시스템" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "전문 비서의 개념" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI가 지원해야 하는 것" })).toBeVisible();
+  await expect(page.locator('.side-nav [data-view="프로젝트 개요"]')).toHaveAttribute("aria-current", "page");
+
+  await page.screenshot({ path: testInfo.outputPath("desktop-project-overview.png"), fullPage: true });
+  await page.locator("#overview-processing").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("desktop-processing-workflow.png"), fullPage: true });
 });
 
 test("Galaxy Tab landscape keeps context visible without horizontal overflow", async ({ page }, testInfo) => {
@@ -63,6 +82,36 @@ test("smartphone uses a single column with bottom navigation", async ({ page }, 
   await page.screenshot({ path: testInfo.outputPath("smartphone-assistant-shell.png"), fullPage: true });
 });
 
+test("smartphone can read the project overview without leaving the fixed shell", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator('.mobile-nav [data-view="프로젝트 개요"]').click();
+
+  await expect(page.locator("#project-overview")).toBeVisible();
+  await expect(page.locator("#assistant-composer")).toBeHidden();
+  await expect(page.locator(".mobile-nav")).toBeVisible();
+  const metrics = await page.evaluate<{
+    documentHeight: number;
+    viewportHeight: number;
+    overviewScrollHeight: number;
+    overviewHeight: number;
+    horizontalOverflow: boolean;
+  }>(`({
+    documentHeight: document.documentElement.scrollHeight,
+    viewportHeight: window.innerHeight,
+    overviewScrollHeight: document.querySelector('#project-overview').scrollHeight,
+    overviewHeight: document.querySelector('#project-overview').clientHeight,
+    horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+  })`);
+  expect(metrics.documentHeight).toBeLessThanOrEqual(metrics.viewportHeight);
+  expect(metrics.overviewScrollHeight).toBeGreaterThan(metrics.overviewHeight);
+  expect(metrics.horizontalOverflow).toBe(false);
+
+  await page.screenshot({ path: testInfo.outputPath("smartphone-project-overview.png"), fullPage: true });
+  await page.locator("#overview-processing").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("smartphone-processing-workflow.png"), fullPage: true });
+});
+
 test("long smartphone conversations scroll inside the conversation region", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/", { waitUntil: "networkidle" });
@@ -104,21 +153,81 @@ test("quick prompts move a suggested request into the composer", async ({ page }
   await expect(page.locator("#ai-message")).toHaveValue("오늘 제가 판단해야 할 것만 알려주세요");
 });
 
-test("AI response streams and the conversation survives a reload", async ({ page }) => {
+test("structured AI response completes and the conversation survives a reload", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await page.locator("#ai-message").fill("Playwright 대화 유지 확인");
   await page.locator("#ai-submit").click();
 
   const response = page.locator(".message-turn.assistant-turn").last();
   await expect(response).toHaveClass(/streaming/);
-  await expect(response.locator("p")).toContainText("스트리밍");
-  await expect(response.locator("p")).toHaveText("스트리밍 응답 완료");
+  await expect(response.locator("p")).toHaveText("구조화 응답 완료");
   await expect(response).not.toHaveClass(/streaming/);
   await expect(page.locator("#ai-status")).toContainText("응답 완료");
 
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.locator("#dynamic-transcript")).toContainText("Playwright 대화 유지 확인");
-  await expect(page.locator("#dynamic-transcript")).toContainText("스트리밍 응답 완료");
+  await expect(page.locator("#dynamic-transcript")).toContainText("구조화 응답 완료");
+});
+
+test("conversation proposes and confirms one durable assistant memo", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator("#ai-message").fill("알파 배포는 금요일에 민수에게 확인해야 해");
+  await page.locator("#ai-form").evaluate((form) => form.requestSubmit());
+  await expect(page.locator(".message-turn.assistant-turn").last()).toContainText("정리 제안");
+  await expect(page.locator(".message-turn.assistant-turn").last()).toContainText("이대로 저장할까요?");
+
+  await page.locator('.side-nav [data-view="받은함"]').click();
+  await expect(page.getByRole("heading", { name: "비서가 정리한 메모" })).toBeVisible();
+  await expect(page.locator(".inbox-item")).toContainText("알파 배포 일정을 금요일에 확인한다.");
+
+  await page.locator('.side-nav [data-view="비서"]').click();
+  await page.locator("#ai-message").fill("저장해");
+  await page.locator("#ai-form").evaluate((form) => form.requestSubmit());
+  await expect(page.locator(".message-turn.assistant-turn").last()).toContainText("저장했습니다");
+
+  await page.locator('.side-nav [data-view="받은함"]').click();
+  await page.locator('[data-inbox-status="confirmed"]').click();
+  await expect(page.locator(".inbox-item")).toContainText("저장됨 · 버전 1");
+  await page.screenshot({ path: testInfo.outputPath("desktop-assistant-inbox.png"), fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('.mobile-nav [data-view="받은함"]').click();
+  await expect(page.locator("#inbox-view")).toBeVisible();
+  const metrics = await page.evaluate<{ documentHeight: number; viewportHeight: number; horizontalOverflow: boolean }>(`({
+    documentHeight: document.documentElement.scrollHeight,
+    viewportHeight: window.innerHeight,
+    horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+  })`);
+  expect(metrics.documentHeight).toBeLessThanOrEqual(metrics.viewportHeight);
+  expect(metrics.horizontalOverflow).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath("smartphone-assistant-inbox.png"), fullPage: true });
+});
+
+test("read-only debug view exposes allowlisted SQLite state on desktop and phone", async ({ page, request }, testInfo) => {
+  await request.post("/api/captures", { data: { body: "debug-visible-capture" } });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator('.side-nav [data-view="디버그"]').click();
+
+  await expect(page.getByRole("heading", { name: "애플리케이션 데이터" })).toBeVisible();
+  await page.locator("#debug-dataset").selectOption("captures");
+  await expect(page.locator("#debug-table-body")).toContainText("debug-visible-capture");
+  await expect(page.locator("#debug-view")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("desktop-debug-view.png"), fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#mobile-settings-button").click();
+  await page.locator("#mobile-debug-button").click();
+  await expect(page.locator("#debug-view")).toBeVisible();
+  const metrics = await page.evaluate<{ documentHeight: number; viewportHeight: number; horizontalOverflow: boolean }>(`({
+    documentHeight: document.documentElement.scrollHeight,
+    viewportHeight: window.innerHeight,
+    horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+  })`);
+  expect(metrics.documentHeight).toBeLessThanOrEqual(metrics.viewportHeight);
+  expect(metrics.horizontalOverflow).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath("smartphone-debug-view.png"), fullPage: true });
 });
 
 test("AI messages work when crypto.randomUUID is unavailable", async ({ page }) => {
@@ -130,8 +239,37 @@ test("AI messages work when crypto.randomUUID is unavailable", async ({ page }) 
   await page.locator("#ai-submit").click();
 
   await expect(page.locator(".message-turn.user-turn").last()).toContainText("UUID 호환성 확인");
-  await expect(page.locator(".message-turn.assistant-turn").last().locator("p")).toHaveText("스트리밍 응답 완료");
+  await expect(page.locator(".message-turn.assistant-turn").last().locator("p")).toHaveText("구조화 응답 완료");
   await expect(page.locator("#ai-status")).toContainText("응답 완료");
+});
+
+test("owner can version the chief-assistant profile from responsive settings", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator("#mobile-settings-button").click();
+
+  await expect(page.locator("#ai-runtime-status")).toHaveText("관리형 · test");
+  await page.locator("#assistant-profile-name").fill("지안");
+  await page.locator("#assistant-owner-address").fill("대표님");
+  await page.locator("#assistant-role-description").fill("개인 운영을 총괄하고 중요한 판단을 선별한다.");
+  await page.locator("#assistant-communication-style").fill("짧고 직접적으로 답한다.");
+  await page.locator("#assistant-working-principles").fill("계획의 허점을 발견하면 지적한다.");
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.locator("#assistant-profile-submit").click();
+
+  await expect(page.locator("#assistant-profile-status")).toHaveText("새 비서 구성을 적용했습니다.");
+  await expect(page.locator("#assistant-profile-version")).toHaveText("버전 2");
+  await page.screenshot({ path: testInfo.outputPath("smartphone-assistant-profile.png"), fullPage: true });
+  await page.locator("#settings-close").click();
+  await expect(page.locator("#view-kicker")).toHaveText("지안");
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("#mobile-settings-button").click();
+  await expect(page.locator("#assistant-profile-name")).toHaveValue("지안");
+  const metrics = await page.evaluate<{ horizontalOverflow: boolean }>(
+    "({ horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth })",
+  );
+  expect(metrics.horizontalOverflow).toBe(false);
 });
 
 test("settings can permanently clear all assistant conversation history", async ({ page, request }, testInfo) => {

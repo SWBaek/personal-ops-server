@@ -14,8 +14,13 @@ import {
   type AiJobSnapshot,
   type AiJobStreamEvent,
 } from "./ai/streaming-service.js";
+import { validateAssistantProfileInput } from "./domain/assistant-profile.js";
 import { InputError, localDateString, optionalIsoDate, requireNonEmptyText } from "./domain/validation.js";
-import { OpsStore } from "./infra/store.js";
+import {
+  DEBUG_DATASETS,
+  type DebugDatasetId,
+  OpsStore,
+} from "./infra/store.js";
 
 interface CreateCaptureBody {
   body?: unknown;
@@ -55,6 +60,11 @@ interface BuildAppOptions {
   aiChatService?: AiChatService;
   aiConversationService?: AiConversationService;
   publicDir?: string;
+  aiRuntime?: {
+    environment: "development" | "production" | "test";
+    mode: "managed" | "custom";
+    isolated: boolean;
+  };
 }
 
 export async function buildApp(options: BuildAppOptions): Promise<FastifyInstance> {
@@ -67,6 +77,29 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.get("/api/health", async () => ({ ok: true, now: new Date().toISOString() }));
 
+  app.get("/api/system/runtime", async () => ({
+    runtime: options.aiRuntime ?? {
+      environment: "test",
+      mode: "managed",
+      isolated: true,
+    },
+  }));
+
+  app.get("/api/assistant/profile", async () => ({
+    profile: options.store.getAssistantProfile(),
+  }));
+
+  app.put<{ Body: Record<string, unknown> }>("/api/assistant/profile", async (request, reply) => {
+    requireConfirmation(request.body?.confirmation, "UPDATE_ASSISTANT_PROFILE");
+    if (options.store.hasActiveAiJobs()) {
+      return reply.code(409).send({ error: "진행 중인 AI 요청이 끝난 뒤 비서 구성을 변경해주세요." });
+    }
+    const profile = options.store.updateAssistantProfile(
+      validateAssistantProfileInput(request.body),
+    );
+    return { profile };
+  });
+
   app.get("/api/captures", async () => ({ captures: options.store.listCaptures() }));
 
   app.post<{ Body: CreateCaptureBody }>("/api/captures", async (request, reply) => {
@@ -74,6 +107,50 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     const capture = options.store.createCapture(body);
     return reply.code(201).send({ capture });
   });
+
+  app.get<{ Querystring: { status?: string } }>("/api/inbox", async (request) => {
+    const status = request.query?.status;
+    if (status && !["pending", "confirmed", "rejected", "superseded"].includes(status)) {
+      throw new InputError("status is not allowed");
+    }
+    return {
+      proposals: options.store.listIntakeProposals(
+        undefined,
+        status as import("./infra/store.js").IntakeProposalStatus | undefined,
+      ),
+      memos: status && status !== "confirmed" ? [] : options.store.listAssistantMemos(),
+    };
+  });
+
+  app.get<{ Params: { id: string } }>("/api/inbox/:id", async (request, reply) => {
+    const memo = options.store.getAssistantMemo(request.params.id);
+    if (!memo) return reply.code(404).send({ error: "비서 메모를 찾을 수 없습니다." });
+    return { memo, versions: options.store.listAssistantMemoVersions(memo.id) };
+  });
+
+  app.get("/api/debug/summary", async () => ({
+    summary: options.store.debugSummary(),
+  }));
+
+  app.get<{ Params: { dataset: string }; Querystring: { limit?: string } }>(
+    "/api/debug/data/:dataset",
+    async (request) => {
+      const dataset = request.params.dataset;
+      if (!DEBUG_DATASETS.some((candidate) => candidate.id === dataset)) {
+        throw new InputError("debug dataset is not allowed");
+      }
+      const limit = request.query?.limit === undefined
+        ? 50
+        : Number.parseInt(request.query.limit, 10);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        throw new InputError("limit must be an integer from 1 to 100");
+      }
+      return {
+        dataset,
+        rows: options.store.debugDataset(dataset as DebugDatasetId, limit),
+      };
+    },
+  );
 
   app.get<{ Querystring: { view?: string } }>("/api/tasks", async (request) => {
     const tasks =
@@ -371,7 +448,11 @@ function publicJob(job: AiJobSnapshot["job"]) {
 }
 
 function publicSnapshot(snapshot: AiJobSnapshot) {
-  return { job: publicJob(snapshot.job), message: snapshot.message };
+  return {
+    job: publicJob(snapshot.job),
+    message: snapshot.message,
+    ...(snapshot.intakeOutcome ? { intakeOutcome: snapshot.intakeOutcome } : {}),
+  };
 }
 
 function isTerminalAiJob(status: AiJobSnapshot["job"]["status"]): boolean {
