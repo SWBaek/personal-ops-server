@@ -144,6 +144,10 @@ Conversations, messages, jobs, role invocations, proposals, approvals, receipts,
 
 SQLite relation tables and FTS are the default. A graph database or embedding index is a derived optimization, never a second source of truth.
 
+The project read slice uses a hybrid retrieval contract. `PRAGMA user_version` migrations preserve existing databases. Confirmed memo versions retain reviewed `projection_json`; stable `projects` and normalized aliases identify a project, while project/action/decision/dependency/risk/meeting/judgment snapshots remain rebuildable and source-version pinned. Exact project questions read the complete current snapshot set through SQL rather than an FTS top-k. FTS5 remains a bounded fallback for general or unresolved questions and never earns complete coverage by itself.
+
+Each turn persists a deterministic `RetrievalPlan`, reader, as-of time, owner timezone, server-owned coverage, unresolved conditions, truncation reason, and included or excluded candidates. Project coverage is complete only when every current memo is classified and the complete relevant snapshot set fits the context. Model grounding cannot upgrade coverage. Assistant messages retain the retrieval-run ID, coverage, structured project brief, and `memo:<id>:v<version>` references so reloads render the same evidence.
+
 ### AI runtime and adapters
 
 Adapters call installed binaries only:

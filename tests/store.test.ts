@@ -157,7 +157,14 @@ test("AI history can be cleared without deleting other application data", () => 
       reasoningEffort: "default",
     });
 
-    assert.deepEqual(store.clearAiHistory(), { conversations: 1, messages: 0, jobs: 0 });
+    assert.deepEqual(store.clearAiHistory(), {
+      conversations: 1,
+      messages: 0,
+      messageSources: 0,
+      jobs: 0,
+      retrievalRuns: 0,
+      retrievalCandidates: 0,
+    });
     assert.equal(store.listAiConversations().length, 0);
     assert.equal(store.listCaptures().length, 1);
     assert.equal(store.listOpenTasks().length, 1);
@@ -191,9 +198,22 @@ test("all application data can be reset atomically when no AI job is active", ()
       intakeProposals: 0,
       assistantMemos: 0,
       assistantMemoVersions: 0,
+      projectionStatuses: 0,
+      projects: 0,
+      projectAliases: 0,
+      projectSnapshots: 0,
+      actionSnapshots: 0,
+      decisionSnapshots: 0,
+      dependencySnapshots: 0,
+      riskSnapshots: 0,
+      meetingSnapshots: 0,
+      judgmentSnapshots: 0,
       conversations: 1,
       messages: 0,
+      messageSources: 0,
       jobs: 0,
+      retrievalRuns: 0,
+      retrievalCandidates: 0,
     });
     assert.equal(store.listCaptures().length, 0);
     assert.equal(store.listOpenTasks().length, 0);

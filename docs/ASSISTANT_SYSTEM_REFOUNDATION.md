@@ -6,6 +6,12 @@ This document translates the new product definition into an implementation seque
 
 The goal is to turn the existing durable AI-chat prototype into a private personal executive office that understands the owner's real project and knowledge context, coordinates specialist roles, and performs validated operational work.
 
+## Current implementation status
+
+The first project-read vertical slice is implemented. Confirmed memo proposals can create source-version-pinned project snapshots; deterministic retrieval resolves exact project aliases, reads all current structured facts through SQL, records candidates and coverage, and renders a reload-stable fixed-section brief in the responsive Projects and conversation surfaces. Existing memos remain preserved as `unprojected`, and ambiguous targets fail closed.
+
+This slice proves the shared project read model and provenance boundary. It does not yet implement specialist job delegation, project mutations, receipts, undo, schedule, standalone meeting workflows, durable knowledge, or cross-domain orchestration.
+
 ## Directional correction
 
 ### Previous center
@@ -201,6 +207,8 @@ Outcome: the system produces a reliable operational brief for one project.
 
 The brief covers outcome, current state, open actions, relevant dates, meetings, decisions, dependencies, risks, and owner judgments needed. Missing evidence is reported rather than filled with invented work.
 
+Implemented vertical slice: confirmed conversational project projections, exact alias resolution, source-pinned snapshots, exhaustive SQL reads, server-owned coverage, retrieval audit, structured briefs, and version-pinned source navigation. The remaining delegation/job-graph acceptance items are deferred until a real multi-role workflow requires them.
+
 Acceptance:
 
 - the project manager receives only project-relevant context and tools;
@@ -313,13 +321,13 @@ Each is reconsidered only when an accepted workflow exposes a concrete limitatio
 
 ## Immediate next design artifacts
 
-Before Phase 1 code, define:
+The next accepted slice extends the same projection, retrieval, coverage, audit, and responsive-source pattern to schedule:
 
-1. the application-owned evidence, excerpt, provenance, and subject contracts;
-2. the versioned SQLite migration and rebuildable read-index schema;
-3. the native capture/text ingestion contract and exclusion rules;
-4. the chief-assistant context-package schema;
-5. a small synthetic benchmark for retrieval and citation behavior;
-6. browser-safe source citation behavior.
+1. define event projection with source-version provenance;
+2. interpret relative dates against the stored IANA owner timezone;
+3. distinguish point events, ranges, recurrence, and exceptions;
+4. define deterministic schedule retrieval plans and completeness rules;
+5. verify localhost and Tailscale interaction on desktop, Galaxy Tab, and smartphone;
+6. keep the view read-only until its context contract is accepted.
 
-The first implementation PR should prove the native evidence/index boundary with synthetic data. The next should prove one end-to-end grounded question. Neither should attempt historical import, mutation, general multi-agent orchestration, or a complete knowledge graph.
+After schedule, extend the foundation in order to standalone meeting detail, durable knowledge, then stable-ID cross-domain orchestration. Historical import, general multi-agent orchestration, and mutations remain outside these read slices.

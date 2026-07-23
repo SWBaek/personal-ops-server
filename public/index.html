@@ -89,9 +89,9 @@
           <div class="conversation-inner">
             <div class="conversation-intro">
               <div>
-                <span class="preview-label">UI PREVIEW</span>
-                <h2>좋은 아침입니다.</h2>
-                <p>지금 필요한 판단과 제가 이어서 처리할 일을 한곳에 정리했습니다.</p>
+                <span class="preview-label">PRIVATE WORKSPACE</span>
+                <h2>무엇을 함께 정리할까요?</h2>
+                <p>프로젝트 이름과 알고 있는 사실을 말씀하면 근거를 보존하고 확인 가능한 브리프로 연결합니다.</p>
               </div>
               <button id="new-context" class="quiet-button" type="button">새 대화</button>
             </div>
@@ -100,31 +100,8 @@
               <article class="turn assistant-turn preview-turn">
                 <div class="assistant-avatar"><svg><use href="#icon-spark" /></svg></div>
                 <div class="turn-content">
-                  <div class="turn-meta"><strong id="preview-assistant-name">주 비서</strong><span>오전 브리핑 · 예시 화면</span></div>
-                  <p class="lead-message">오늘은 세 가지에만 집중하면 됩니다. 먼저 제품의 화면 구조를 확정하고, 나머지는 제가 정리해 두겠습니다.</p>
-
-                  <section class="focus-list" aria-label="오늘의 주요 항목">
-                    <article class="focus-item important">
-                      <span class="focus-index">01</span>
-                      <div><small>지금 판단할 것</small><strong>비서 화면의 기본 구조 선택</strong><p>대화 중심 구조와 기기별 배치를 먼저 확인합니다.</p></div>
-                      <span class="status-chip amber">판단 필요</span>
-                    </article>
-                    <article class="focus-item">
-                      <span class="focus-index">02</span>
-                      <div><small>이어서 할 것</small><strong>네이티브 자료 수집 방식 설계</strong><p>화면이 확정되면 입력과 근거 표시 흐름을 연결합니다.</p></div>
-                      <span class="status-chip">다음 단계</span>
-                    </article>
-                    <article class="focus-item">
-                      <span class="focus-index">03</span>
-                      <div><small>비서가 맡은 일</small><strong>세 기기 화면 검증</strong><p>PC, 갤럭시 탭, 스마트폰에서 같은 흐름을 점검합니다.</p></div>
-                      <span class="status-chip green"><svg><use href="#icon-check" /></svg> 진행 중</span>
-                    </article>
-                  </section>
-
-                  <div class="assistant-note">
-                    <svg><use href="#icon-spark" /></svg>
-                    <p><strong>제안</strong> 먼저 이 화면의 정보 밀도와 배치를 살펴보세요. 기능 연결은 구조가 결정된 뒤 진행해도 늦지 않습니다.</p>
-                  </div>
+                  <div class="turn-meta"><strong id="preview-assistant-name">주 비서</strong><span>시작 안내</span></div>
+                  <p class="lead-message">일반 대화는 그대로 답하고, 보존할 내용은 메모와 프로젝트 projection으로 정리해 저장 여부를 먼저 확인합니다.</p>
                 </div>
               </article>
               <div id="dynamic-transcript" class="dynamic-transcript"></div>
@@ -196,11 +173,11 @@
               <div class="processing-flow" aria-label="대화형 수집 처리 흐름">
                 <article><span>01</span><strong>사용자 발언</strong><p>원문을 AI 메시지와 작업으로 먼저 보존</p><code>ai_messages · ai_jobs</code></article>
                 <i>→</i>
-                <article><span>02</span><strong>맥락 구성</strong><p>최근 대화와 허용된 메모만 제한적으로 조합</p><code>buildAssistantTurnContext</code></article>
+                <article><span>02</span><strong>검색·맥락 구성</strong><p>정확한 프로젝트 별칭을 결정론적으로 해석하고 snapshot 전체를 SQL로 조회</p><code>retrieval_runs · snapshots</code></article>
                 <i>→</i>
                 <article><span>03</span><strong>AI 판단</strong><p>저장 가치·의미 종류·모호함·확인 의도를 판단</p><code>Codex / Grok CLI</code></article>
                 <i>→</i>
-                <article><span>04</span><strong>스키마 검증</strong><p>자유 텍스트가 아닌 고정 JSON 계약으로 검사</p><code>AssistantTurnEnvelope</code></article>
+                <article><span>04</span><strong>스키마·근거 검증</strong><p>고정 JSON 계약과 검색 결과 ID로 응답·인용을 검사</p><code>AssistantTurnEnvelope</code></article>
                 <i>→</i>
                 <article><span>05</span><strong>대화 확인</strong><p>저장해·고쳐줘·저장하지 마를 대기 제안에 연결</p><code>intake_proposals</code></article>
                 <i>→</i>
@@ -224,7 +201,9 @@
                   <ul>
                     <li><code>ai_messages</code><span>현재 대화의 최근 메시지</span></li>
                     <li><code>intake_proposals</code><span>현재 대화에서 확인을 기다리는 제안</span></li>
-                    <li><code>assistant_memos</code><span>최근 확정 메모와 현재 버전</span></li>
+                    <li><code>project_*_snapshots</code><span>확정 프로젝트의 현재 구조화 사실 전체 집합</span></li>
+                    <li><code>assistant_memo_search</code><span>대상 미확정 질문과 원문 설명을 위한 보조 FTS 후보</span></li>
+                    <li><code>ai_message_sources</code><span>검증을 통과해 답변에 실제 사용된 메모 근거</span></li>
                     <li><code>assistant_profiles</code><span>사용자가 확정한 비서 이름·역할·대화 방식·업무 원칙</span></li>
                     <li><code>src/ai/streaming-service.ts</code><span>저장 가치와 확인 방식에 관한 고정 지침</span></li>
                     <li><code>src/domain/intake.ts</code><span>허용되는 출력 종류·길이·구조의 JSON Schema</span></li>
@@ -299,15 +278,50 @@
               <ol class="roadmap-list">
                 <li class="complete"><span><svg><use href="#icon-check" /></svg></span><div><small>확정</small><h4>반응형 비서 화면 구조</h4><p>하나의 주 비서와 PC·태블릿·스마트폰 공통 정보 구조</p></div></li>
                 <li class="complete"><span><svg><use href="#icon-check" /></svg></span><div><small>확정</small><h4>대화형 수집 파이프라인</h4><p>불완전한 자연어를 비서 메모로 제안하고 대화로 확인</p></div></li>
-                <li class="next"><span>3</span><div><small>다음</small><h4>근거 기반 비서 응답</h4><p>저장된 원문과 메모를 검색해 출처와 함께 답변</p></div></li>
-                <li><span>4</span><div><small>예정</small><h4>프로젝트 관리자 워크플로</h4><p>상태·행동·결정·위험을 근거와 함께 브리핑</p></div></li>
-                <li><span>5</span><div><small>예정</small><h4>안전한 실행과 영수증</h4><p>구조화 작업, 검증, 멱등성, 교정과 제한된 실행 취소</p></div></li>
+                <li class="complete"><span><svg><use href="#icon-check" /></svg></span><div><small>완료</small><h4>근거 기반 비서 응답</h4><p>저장된 원문과 메모를 검색해 출처와 함께 답변</p></div></li>
+                <li class="complete"><span><svg><use href="#icon-check" /></svg></span><div><small>완료</small><h4>프로젝트 관리자 읽기 워크플로</h4><p>상태·행동·결정·위험을 버전 고정 근거와 coverage로 브리핑</p></div></li>
+                <li class="next"><span>5</span><div><small>다음</small><h4>일정 읽기 기반</h4><p>상대 날짜, 범위, 반복과 예외를 event projection으로 연결</p></div></li>
                 <li><span>6</span><div><small>이후</small><h4>지식·능동 지원·선택적 가져오기</h4><p>지속 지식, 예약된 후속 조치와 독립적인 과거 자료 흡수</p></div></li>
               </ol>
-              <div class="next-slice"><p>NEXT VERTICAL SLICE</p><strong>저장된 원문·비서 메모 검색 → 제한된 맥락 구성 → 출처가 있는 비서 답변</strong></div>
+              <div class="next-slice"><p>NEXT VERTICAL SLICE</p><strong>일정 event projection → 시간대·상대 날짜 해석 → 근거가 있는 일정 읽기</strong></div>
             </section>
 
             <footer class="overview-footer"><span>Personal Ops Server</span><p>제품 개요 · 현재 기준선</p></footer>
+          </div>
+        </section>
+
+        <section id="projects-view" class="projects-view" aria-labelledby="projects-heading" hidden>
+          <div class="projects-shell">
+            <aside class="projects-directory" aria-label="프로젝트 목록">
+              <header class="projects-header">
+                <div><p>OPERATIONAL PROJECTS</p><h2 id="projects-heading">프로젝트</h2><span>대화에서 확인된 프로젝트를 읽기 전용으로 살펴봅니다.</span></div>
+                <button id="projects-refresh" class="quiet-button" type="button">새로고침</button>
+              </header>
+              <div id="projects-status" class="projects-status" aria-live="polite">프로젝트를 불러오는 중…</div>
+              <div id="projects-list" class="projects-list"></div>
+            </aside>
+            <article id="project-detail" class="project-detail" aria-live="polite">
+              <div id="project-detail-empty" class="project-empty">
+                <span class="project-empty-mark"><svg><use href="#icon-folder" /></svg></span>
+                <h3>아직 선택한 프로젝트가 없습니다.</h3>
+                <p>비서 대화에서 프로젝트의 결과, 현재 상태, 행동이나 위험을 말씀하고 정리 제안을 확인하면 이곳에 나타납니다.</p>
+                <button class="primary-button" type="button" data-project-chat>비서에게 프로젝트 전달</button>
+              </div>
+              <div id="project-detail-content" hidden>
+                <button id="project-back" class="project-back" type="button"><svg><use href="#icon-chevron" /></svg> 프로젝트 목록</button>
+                <header class="project-detail-header">
+                  <div><p>PROJECT BRIEF</p><h2 id="project-detail-name"></h2><span id="project-detail-aliases"></span></div>
+                  <button id="project-brief-request" class="primary-button" type="button">비서에게 브리핑 요청</button>
+                </header>
+                <div id="project-coverage" class="project-coverage"></div>
+                <p id="project-updated" class="project-updated"></p>
+                <div id="project-brief-sections" class="project-brief-sections"></div>
+                <section class="project-sources">
+                  <div class="project-section-heading"><p>SOURCES</p><h3>버전 고정 출처</h3></div>
+                  <div id="project-source-list" class="project-source-list"></div>
+                </section>
+              </div>
+            </article>
           </div>
         </section>
 
@@ -376,7 +390,7 @@
               <svg><use href="#icon-send" /></svg>
             </button>
           </form>
-          <p class="prototype-disclaimer">화면 구조 검토용 시안 · 예시 정보는 실제 운영 데이터가 아닙니다.</p>
+          <p class="prototype-disclaimer">AI 응답과 저장 제안은 근거·coverage·확정 상태를 함께 확인하세요.</p>
         </footer>
       </main>
 
@@ -386,45 +400,10 @@
           <button class="icon-button context-close" type="button" aria-label="운영 상황 닫기"><svg><use href="#icon-close" /></svg></button>
         </header>
 
-        <section class="context-section attention-section">
-          <div class="section-heading"><h3>확인 필요</h3><span>1</span></div>
-          <button class="review-card" type="button" data-prototype-action="제안 검토">
-            <span class="review-icon">?</span>
-            <div><small>프로젝트 관리자 제안</small><strong>다음 구현 순서를 검토해주세요</strong><p>앱 네이티브 근거 구조 → 비서 질문 흐름</p></div>
-            <svg><use href="#icon-chevron" /></svg>
-          </button>
-        </section>
-
         <section class="context-section">
-          <div class="section-heading"><h3>오늘</h3><button type="button" data-prototype-action="오늘 전체 보기">전체 보기</button></div>
-          <div class="today-summary">
-            <div><strong>3</strong><span>집중 항목</span></div>
-            <div><strong>1</strong><span>내 판단</span></div>
-            <div><strong>2</strong><span>비서 진행</span></div>
-          </div>
-        </section>
-
-        <section class="context-section">
-          <div class="section-heading"><h3>진행 중</h3><button type="button" data-prototype-action="프로젝트 전체 보기">프로젝트</button></div>
-          <div class="project-list">
-            <button class="project-row" type="button" data-prototype-action="제품 개편 프로젝트">
-              <span class="project-symbol sage">PO</span>
-              <span><strong>제품 경험 개편</strong><small>UI 구조 검토 중</small></span>
-              <em>40%</em>
-            </button>
-            <button class="project-row" type="button" data-prototype-action="근거 구조 프로젝트">
-              <span class="project-symbol blue">DB</span>
-              <span><strong>근거·맥락 기반</strong><small>다음 단계 대기</small></span>
-              <em>10%</em>
-            </button>
-          </div>
-        </section>
-
-        <section class="context-section recent-section">
-          <div class="section-heading"><h3>최근 활동</h3></div>
-          <div class="activity-row">
-            <span class="activity-icon"><svg><use href="#icon-check" /></svg></span>
-            <div><strong>제품 원칙을 정리했습니다</strong><small>WorkOS 독립성 명시 · 방금 전</small></div>
+          <div class="section-heading"><h3>프로젝트</h3><button id="context-projects-open" type="button">전체 보기</button></div>
+          <div id="context-project-list" class="project-list">
+            <p class="context-empty">확정된 프로젝트를 불러오는 중…</p>
           </div>
         </section>
       </aside>
@@ -464,6 +443,7 @@
               <label>역할<textarea id="assistant-role-description" name="roleDescription" maxlength="1000" rows="3" required></textarea></label>
               <label>대화 방식<textarea id="assistant-communication-style" name="communicationStyle" maxlength="1000" rows="3" required></textarea></label>
               <label>업무 원칙<textarea id="assistant-working-principles" name="workingPrinciples" maxlength="2000" rows="4" required></textarea></label>
+              <label>기준 시간대<input id="assistant-timezone" name="timezone" maxlength="100" placeholder="Asia/Seoul" required /></label>
               <div class="profile-actions">
                 <p id="assistant-profile-status" aria-live="polite"></p>
                 <button id="assistant-profile-submit" class="primary-button" type="submit">변경 검토</button>

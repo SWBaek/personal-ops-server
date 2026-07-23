@@ -72,6 +72,9 @@ Proactive agents remain in Observe unless a specific pre-authorized automation c
 - Keep provider credentials and session files outside application storage and prompts.
 - Give roles allowlisted application-domain tools rather than general shell or filesystem access.
 - Bound context by goal, role, source scope, and token budget.
+- Reject answer citations whose application record IDs were not present in the bounded context package.
+- Validate citations as exact version-pinned references and reject superseded versions or sources outside the selected project manifest.
+- Let deterministic server code classify retrieval coverage. A model may not turn partial or unknown evidence into a closed-world claim that an item is all, unique, or absent.
 - Treat provider reasoning, hidden traces, and raw diagnostics as non-displayable internal data.
 - Keep development debugging read-only and dataset-allowlisted. It may expose application-owned conversation and memo rows, but never arbitrary SQL, provider thread identifiers, client request keys, database paths, credentials, or SQLite metadata outside the allowlist.
 
