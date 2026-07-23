@@ -4,6 +4,23 @@ const viewKicker = document.querySelector("#view-kicker");
 const viewTitle = document.querySelector("#view-title");
 const assistantView = document.querySelector("#assistant-view");
 const projectOverview = document.querySelector("#project-overview");
+const projectsView = document.querySelector("#projects-view");
+const projectsRefresh = document.querySelector("#projects-refresh");
+const projectsStatus = document.querySelector("#projects-status");
+const projectsList = document.querySelector("#projects-list");
+const projectDetail = document.querySelector("#project-detail");
+const projectDetailEmpty = document.querySelector("#project-detail-empty");
+const projectDetailContent = document.querySelector("#project-detail-content");
+const projectDetailName = document.querySelector("#project-detail-name");
+const projectDetailAliases = document.querySelector("#project-detail-aliases");
+const projectCoverage = document.querySelector("#project-coverage");
+const projectUpdated = document.querySelector("#project-updated");
+const projectBriefSections = document.querySelector("#project-brief-sections");
+const projectSourceList = document.querySelector("#project-source-list");
+const projectBack = document.querySelector("#project-back");
+const projectBriefRequest = document.querySelector("#project-brief-request");
+const contextProjectList = document.querySelector("#context-project-list");
+const contextProjectsOpen = document.querySelector("#context-projects-open");
 const inboxView = document.querySelector("#inbox-view");
 const inboxList = document.querySelector("#inbox-list");
 const inboxStatus = document.querySelector("#inbox-status");
@@ -53,6 +70,7 @@ const assistantOwnerAddress = document.querySelector("#assistant-owner-address")
 const assistantRoleDescription = document.querySelector("#assistant-role-description");
 const assistantCommunicationStyle = document.querySelector("#assistant-communication-style");
 const assistantWorkingPrinciples = document.querySelector("#assistant-working-principles");
+const assistantTimezone = document.querySelector("#assistant-timezone");
 const assistantProfileVersion = document.querySelector("#assistant-profile-version");
 const assistantProfileStatus = document.querySelector("#assistant-profile-status");
 const assistantProfileSubmit = document.querySelector("#assistant-profile-submit");
@@ -68,6 +86,9 @@ let toastTimer = null;
 let pendingResetMode = "";
 let activeInboxStatus = "pending";
 let assistantProfile = { name: "주 비서" };
+let selectedProjectId = "";
+let loadedProjects = [];
+let selectedProjectBrief = null;
 
 const resetModes = {
   chat: {
@@ -105,7 +126,7 @@ document.addEventListener("keydown", (event) => {
 
 for (const button of document.querySelectorAll("[data-view]")) {
   button.addEventListener("click", () => {
-    if (["비서", "프로젝트 개요", "받은함", "디버그"].includes(button.dataset.view)) {
+    if (["비서", "프로젝트 개요", "프로젝트", "받은함", "디버그"].includes(button.dataset.view)) {
       showView(button.dataset.view);
       return;
     }
@@ -113,6 +134,7 @@ for (const button of document.querySelectorAll("[data-view]")) {
   });
 }
 
+projectsRefresh.addEventListener("click", () => void loadProjects());
 inboxRefresh.addEventListener("click", () => void loadInbox());
 debugRefresh.addEventListener("click", () => void loadDebug());
 debugDataset.addEventListener("change", () => void loadDebugDataset());
@@ -132,6 +154,22 @@ for (const button of document.querySelectorAll("[data-inbox-status]")) {
 for (const button of document.querySelectorAll("[data-prototype-action]")) {
   button.addEventListener("click", () => showToast(`${button.dataset.prototypeAction} 기능은 현재 UI 시안입니다.`));
 }
+
+for (const button of document.querySelectorAll("[data-project-chat]")) {
+  button.addEventListener("click", () => prepareProjectChat(""));
+}
+contextProjectsOpen.addEventListener("click", () => showView("프로젝트"));
+projectBack.addEventListener("click", () => {
+  selectedProjectId = "";
+  selectedProjectBrief = null;
+  projectDetail.classList.remove("has-selection");
+  projectDetailContent.hidden = true;
+  projectDetailEmpty.hidden = false;
+  projectsView.classList.remove("detail-open");
+});
+projectBriefRequest.addEventListener("click", () => {
+  prepareProjectChat(selectedProjectBrief?.project.name || "");
+});
 
 document.querySelector("#search-button").addEventListener("click", () => showToast("통합 검색은 다음 화면 설계에서 연결합니다."));
 document.querySelector("#attach-button").addEventListener("click", () => showToast("자료 추가 흐름은 UI 구조 확정 후 연결합니다."));
@@ -259,20 +297,25 @@ function setContextOpen(open) {
   contextPanel.setAttribute("aria-hidden", String(!open && window.matchMedia("(max-width: 960px)").matches));
 }
 
-function showView(view) {
+function showView(view, loadData = true) {
   const overviewActive = view === "프로젝트 개요";
+  const projectsActive = view === "프로젝트";
   const inboxActive = view === "받은함";
   const debugActive = view === "디버그";
   body.classList.toggle("overview-active", overviewActive);
+  body.classList.toggle("projects-active", projectsActive);
   body.classList.toggle("inbox-active", inboxActive);
   body.classList.toggle("debug-active", debugActive);
-  assistantView.hidden = overviewActive || inboxActive || debugActive;
-  assistantComposer.hidden = overviewActive || inboxActive || debugActive;
+  assistantView.hidden = overviewActive || projectsActive || inboxActive || debugActive;
+  assistantComposer.hidden = overviewActive || projectsActive || inboxActive || debugActive;
   projectOverview.hidden = !overviewActive;
+  projectsView.hidden = !projectsActive;
   inboxView.hidden = !inboxActive;
   debugView.hidden = !debugActive;
   viewKicker.textContent = overviewActive
     ? "PERSONAL OPS"
+    : projectsActive
+      ? "운영 상태"
     : inboxActive
       ? "비서 메모"
       : debugActive
@@ -280,6 +323,8 @@ function showView(view) {
         : assistantProfile.name;
   viewTitle.textContent = overviewActive
     ? "프로젝트 개요"
+    : projectsActive
+      ? "프로젝트"
     : inboxActive
       ? "받은함"
       : debugActive
@@ -295,8 +340,9 @@ function showView(view) {
   }
 
   if (overviewActive) projectOverview.scrollTo({ top: 0 });
-  else if (inboxActive) void loadInbox();
-  else if (debugActive) void loadDebug();
+  else if (projectsActive && loadData) void loadProjects();
+  else if (inboxActive && loadData) void loadInbox();
+  else if (debugActive && loadData) void loadDebug();
   else aiMessage.focus();
 }
 
@@ -337,9 +383,11 @@ function applyAssistantProfile(profile) {
   assistantRoleDescription.value = profile.roleDescription;
   assistantCommunicationStyle.value = profile.communicationStyle;
   assistantWorkingPrinciples.value = profile.workingPrinciples;
+  assistantTimezone.value = profile.timezone;
   assistantProfileVersion.textContent = `버전 ${profile.version}`;
   previewAssistantName.textContent = profile.name;
   if (!body.classList.contains("overview-active")
+    && !body.classList.contains("projects-active")
     && !body.classList.contains("inbox-active")
     && !body.classList.contains("debug-active")) {
     viewKicker.textContent = profile.name;
@@ -361,6 +409,7 @@ async function saveAssistantProfile(event) {
         roleDescription: assistantRoleDescription.value,
         communicationStyle: assistantCommunicationStyle.value,
         workingPrinciples: assistantWorkingPrinciples.value,
+        timezone: assistantTimezone.value,
       }),
     });
     applyAssistantProfile(result.profile);
@@ -405,7 +454,10 @@ async function performDataReset() {
       body: JSON.stringify({ confirmation: mode.confirmation }),
     });
     resetConversationUi();
-    if (pendingResetMode === "all") await loadAssistantSettings();
+    if (pendingResetMode === "all") {
+      await loadAssistantSettings();
+      await loadProjects();
+    }
     settingsDialog.close();
     showToast(mode.success);
   } catch (error) {
@@ -568,6 +620,8 @@ function renderMessages(messages) {
     const fallback = message.status === "cancelled" ? "취소된 요청" : message.status === "failed" ? "완료되지 않은 요청" : "";
     const node = buildMessage(role, message.content || fallback, formatMeta(message));
     node.dataset.messageId = message.id;
+    renderProjectBriefMessage(node, message);
+    renderGrounding(node, message);
     if (["pending", "streaming"].includes(message.status)) node.classList.add("streaming");
     return node;
   }));
@@ -623,6 +677,8 @@ function connectToJob(jobId, assistantNode) {
     const data = JSON.parse(event.data);
     paragraph.textContent = data.message.content;
     detail.textContent = formatMeta(data.message);
+    renderProjectBriefMessage(assistantNode, data.message);
+    renderGrounding(assistantNode, data.message);
   });
   source.addEventListener("delta", (event) => {
     const data = JSON.parse(event.data);
@@ -637,11 +693,14 @@ function connectToJob(jobId, assistantNode) {
     const data = JSON.parse(event.data);
     paragraph.textContent = data.message.content;
     detail.textContent = formatMeta(data.message, data.streamMode);
+    renderProjectBriefMessage(assistantNode, data.message);
+    renderGrounding(assistantNode, data.message);
     assistantNode.classList.remove("streaming");
     aiStatus.textContent = "응답 완료";
     source.close();
     finishRequest();
     void refreshInboxCount();
+    void loadProjects();
   });
   source.addEventListener("failed", (event) => {
     const data = JSON.parse(event.data);
@@ -659,6 +718,218 @@ function connectToJob(jobId, assistantNode) {
     aiStatus.textContent = "연결을 복구하는 중…";
     setTimeout(() => void loadConversation(conversationId), 500);
   };
+}
+
+async function loadProjects() {
+  projectsStatus.hidden = false;
+  projectsStatus.textContent = "프로젝트를 불러오는 중…";
+  try {
+    const result = await request("/api/projects");
+    loadedProjects = result.projects;
+    renderContextProjects(loadedProjects);
+    projectsList.replaceChildren(...loadedProjects.map(buildProjectListItem));
+    if (!loadedProjects.length) {
+      projectsStatus.textContent = "아직 확인된 프로젝트가 없습니다. 비서 대화에서 프로젝트 정보를 전달해 주세요.";
+      selectedProjectId = "";
+      selectedProjectBrief = null;
+      projectDetailContent.hidden = true;
+      projectDetailEmpty.hidden = false;
+      projectsView.classList.remove("detail-open");
+      return;
+    }
+    projectsStatus.hidden = true;
+    if (selectedProjectId && loadedProjects.some((project) => project.id === selectedProjectId)) {
+      await loadProjectDetail(selectedProjectId);
+    } else if (window.matchMedia("(min-width: 961px)").matches) {
+      await loadProjectDetail(loadedProjects[0].id);
+    }
+  } catch (error) {
+    projectsStatus.textContent = error.message;
+  }
+}
+
+function buildProjectListItem(project) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "projects-list-item";
+  button.dataset.projectId = project.id;
+  button.setAttribute("aria-pressed", String(project.id === selectedProjectId));
+  const mark = document.createElement("span");
+  mark.className = "project-list-mark";
+  mark.textContent = project.name.slice(0, 2).toLocaleUpperCase("ko-KR");
+  const copy = document.createElement("span");
+  const name = document.createElement("strong");
+  name.textContent = project.name;
+  const status = document.createElement("small");
+  status.textContent = project.coverage === "complete"
+    ? "근거 분류 완료"
+    : project.coverageReasons.join(" · ") || "coverage 확인 필요";
+  copy.append(name, status);
+  const coverage = document.createElement("em");
+  coverage.className = `coverage-dot coverage-${project.coverage}`;
+  coverage.textContent = project.coverage;
+  button.append(mark, copy, coverage);
+  button.addEventListener("click", () => void loadProjectDetail(project.id));
+  return button;
+}
+
+async function loadProjectDetail(projectId) {
+  selectedProjectId = projectId;
+  for (const item of projectsList.querySelectorAll("[data-project-id]")) {
+    const selected = item.dataset.projectId === projectId;
+    item.classList.toggle("active", selected);
+    item.setAttribute("aria-pressed", String(selected));
+  }
+  projectDetailEmpty.hidden = true;
+  projectDetailContent.hidden = false;
+  projectDetail.classList.add("has-selection");
+  projectsView.classList.add("detail-open");
+  projectDetailName.textContent = "불러오는 중…";
+  projectBriefSections.replaceChildren();
+  projectSourceList.replaceChildren();
+  try {
+    const result = await request(`/api/projects/${encodeURIComponent(projectId)}`);
+    selectedProjectBrief = result.brief;
+    renderProjectDetail(result.brief);
+  } catch (error) {
+    projectDetailName.textContent = "프로젝트를 불러오지 못했습니다.";
+    projectCoverage.className = "project-coverage coverage-partial";
+    projectCoverage.textContent = error.message;
+  }
+}
+
+function renderProjectDetail(brief) {
+  projectDetailName.textContent = brief.project.name;
+  projectDetailAliases.textContent = brief.project.aliases.length
+    ? `별칭 · ${brief.project.aliases.join(" · ")}`
+    : "등록된 별칭 없음";
+  projectCoverage.className = `project-coverage coverage-${brief.coverage}`;
+  projectCoverage.textContent = coverageText(brief.coverage, brief.coverageReasons);
+  projectUpdated.textContent = `마지막 갱신 ${formatDateTime(brief.project.updatedAt)} · 기준 ${formatDateTime(brief.asOf)} · ${brief.timezone}`;
+  const referenceMap = new Map(brief.references.map((reference) => [reference.referenceId, reference]));
+  const sectionDefinitions = [
+    ["outcomes", "결과"],
+    ["currentState", "현재 상태"],
+    ["openActions", "열린 Action과 날짜"],
+    ["decisions", "결정"],
+    ["dependencies", "의존성"],
+    ["risks", "위험"],
+    ["meetings", "관련 회의"],
+    ["judgments", "사용자 판단 필요"],
+    ["conflictsAndUnknowns", "충돌과 미확인 사항"],
+  ];
+  projectBriefSections.replaceChildren(...sectionDefinitions.map(([key, label]) =>
+    buildProjectSection(label, brief.sections[key] || [], referenceMap, brief.coverage)));
+  projectSourceList.replaceChildren(...brief.references.map(buildProjectSourceChip));
+  if (!brief.references.length) {
+    const empty = document.createElement("p");
+    empty.className = "project-section-empty";
+    empty.textContent = "연결된 출처가 없습니다.";
+    projectSourceList.append(empty);
+  }
+}
+
+function buildProjectSection(label, items, referenceMap, coverage) {
+  const section = document.createElement("section");
+  section.className = "project-brief-section";
+  const heading = document.createElement("div");
+  heading.className = "project-section-heading";
+  const kicker = document.createElement("p");
+  kicker.textContent = String(items.length).padStart(2, "0");
+  const title = document.createElement("h3");
+  title.textContent = label;
+  heading.append(kicker, title);
+  const list = document.createElement("div");
+  list.className = "project-fact-list";
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "project-section-empty";
+    empty.textContent = coverage === "complete"
+      ? "현재 분류된 근거에는 기록이 없습니다."
+      : "확인된 기록이 없습니다. coverage가 완전하지 않아 부재를 단정하지 않습니다.";
+    list.append(empty);
+  } else {
+    for (const item of items) {
+      const article = document.createElement("article");
+      const text = document.createElement("p");
+      text.textContent = formatProjectFact(item);
+      const sources = document.createElement("div");
+      sources.className = "project-item-sources";
+      for (const referenceId of item.referenceIds) {
+        const reference = referenceMap.get(referenceId);
+        if (reference) sources.append(buildProjectSourceChip(reference, true));
+      }
+      article.append(text, sources);
+      list.append(article);
+    }
+  }
+  section.append(heading, list);
+  return section;
+}
+
+function buildProjectSourceChip(reference, compact = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `project-source-chip${compact ? " compact" : ""}`;
+  button.textContent = `${reference.summary} · v${reference.version}`;
+  button.title = reference.referenceId;
+  button.addEventListener("click", () => void openMemoSource(reference.memoId, reference.version));
+  return button;
+}
+
+function formatProjectFact(item) {
+  const details = [];
+  if (item.status) details.push(item.status);
+  if (item.plannedOn) details.push(`계획 ${item.plannedOn}`);
+  if (item.dueOn) details.push(`기한 ${item.dueOn}`);
+  if (item.occurredAt) details.push(item.occurredAt);
+  return `${item.text}${details.length ? ` · ${details.join(" · ")}` : ""}`;
+}
+
+function coverageText(coverage, reasons = []) {
+  if (coverage === "complete") return "Complete · 현재 메모가 모두 분류되었고 snapshot 전체를 조회했습니다.";
+  if (coverage === "partial") return `Partial · ${reasons.join(" · ") || "일부 근거를 완전히 분류하거나 조회하지 못했습니다."}`;
+  return `Unknown · ${reasons.join(" · ") || "프로젝트와 조회 범위를 확정하지 못했습니다."}`;
+}
+
+function renderContextProjects(projects) {
+  contextProjectList.replaceChildren();
+  if (!projects.length) {
+    const empty = document.createElement("p");
+    empty.className = "context-empty";
+    empty.textContent = "아직 확인된 프로젝트가 없습니다.";
+    contextProjectList.append(empty);
+    return;
+  }
+  for (const project of projects.slice(0, 4)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "project-row";
+    const symbol = document.createElement("span");
+    symbol.className = "project-symbol";
+    symbol.textContent = project.name.slice(0, 2);
+    const copy = document.createElement("span");
+    const strong = document.createElement("strong");
+    strong.textContent = project.name;
+    const small = document.createElement("small");
+    small.textContent = project.coverage === "complete" ? "근거 분류 완료" : "coverage 확인 필요";
+    copy.append(strong, small);
+    button.append(symbol, copy);
+    button.addEventListener("click", () => {
+      selectedProjectId = project.id;
+      showView("프로젝트");
+    });
+    contextProjectList.append(button);
+  }
+}
+
+function prepareProjectChat(projectName) {
+  showView("비서", false);
+  aiMessage.value = projectName
+    ? `${projectName} 프로젝트의 현재 상태, 열린 Action, 결정, 의존성, 위험, 관련 회의와 제가 판단할 점을 브리핑해 주세요.`
+    : "새 프로젝트의 이름, 원하는 결과, 현재 상태와 알고 있는 행동·결정·위험을 말씀드릴게요.";
+  resizeComposer();
+  aiMessage.focus();
 }
 
 async function loadInbox() {
@@ -696,6 +967,7 @@ async function refreshInboxCount() {
 function buildInboxItem(item) {
   const article = document.createElement("article");
   article.className = "inbox-item";
+  if (item.id) article.id = `memo-${item.id}`;
   const heading = document.createElement("div");
   heading.className = "inbox-item-heading";
   const copy = document.createElement("div");
@@ -733,12 +1005,158 @@ function buildInboxItem(item) {
   return article;
 }
 
+function renderProjectBriefMessage(messageNode, message) {
+  const content = messageNode.querySelector(".message-body");
+  const paragraph = content.querySelector(":scope > p");
+  content.querySelector(".message-project-brief")?.remove();
+  paragraph.hidden = false;
+  if (message.role !== "assistant" || !message.projectBrief) return;
+
+  const brief = message.projectBrief;
+  paragraph.hidden = true;
+  const panel = document.createElement("section");
+  panel.className = "message-project-brief";
+  const header = document.createElement("header");
+  const copy = document.createElement("div");
+  const kicker = document.createElement("p");
+  kicker.textContent = "PROJECT BRIEF";
+  const title = document.createElement("h3");
+  title.textContent = brief.project.name;
+  copy.append(kicker, title);
+  const coverage = document.createElement("span");
+  coverage.className = `message-coverage coverage-${message.coverage || brief.coverage}`;
+  coverage.textContent = message.coverage || brief.coverage;
+  header.append(copy, coverage);
+  const coverageNote = document.createElement("p");
+  coverageNote.className = "message-coverage-note";
+  coverageNote.textContent = coverageText(message.coverage || brief.coverage, brief.coverageReasons);
+  const sections = document.createElement("div");
+  sections.className = "message-brief-grid";
+  const referenceMap = new Map(brief.references.map((reference) => [reference.referenceId, reference]));
+  const definitions = [
+    ["outcomes", "결과"],
+    ["currentState", "현재 상태"],
+    ["openActions", "열린 Action과 날짜"],
+    ["decisions", "결정"],
+    ["dependencies", "의존성"],
+    ["risks", "위험"],
+    ["meetings", "관련 회의"],
+    ["judgments", "사용자 판단 필요"],
+    ["conflictsAndUnknowns", "충돌과 미확인 사항"],
+  ];
+  sections.append(...definitions.map(([key, label]) =>
+    buildProjectSection(label, brief.sections[key] || [], referenceMap, message.coverage || brief.coverage)));
+  panel.append(header, coverageNote, sections);
+  const meta = content.querySelector(":scope > small");
+  content.insertBefore(panel, meta);
+}
+
+function renderGrounding(messageNode, message) {
+  const content = messageNode.querySelector(".message-body");
+  content.querySelector(".grounding-panel")?.remove();
+  if (message.role !== "assistant" || !message.groundingStatus) return;
+
+  const panel = document.createElement("div");
+  panel.className = `grounding-panel grounding-${message.groundingStatus}`;
+  const label = document.createElement("span");
+  label.className = "grounding-label";
+  label.textContent = ({
+    grounded: "저장 근거",
+    insufficient: "저장 근거 부족",
+    conflicting: "근거 충돌",
+    not_applicable: "",
+  })[message.groundingStatus] || "";
+  if (label.textContent) panel.append(label);
+  if (message.coverage) {
+    const coverage = document.createElement("span");
+    coverage.className = `grounding-coverage coverage-${message.coverage}`;
+    coverage.textContent = `coverage ${message.coverage}`;
+    panel.append(coverage);
+  }
+
+  for (const source of message.sources || []) {
+    const link = document.createElement("a");
+    link.className = "grounding-source";
+    link.href = `#memo-${source.memoId}`;
+    link.textContent = `${source.summary} · v${source.version}`;
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      void openMemoSource(source.memoId, source.version);
+    });
+    panel.append(link);
+  }
+
+  for (const conflict of message.groundingConflicts || []) {
+    const note = document.createElement("span");
+    note.className = "grounding-conflict";
+    note.textContent = conflict;
+    panel.append(note);
+  }
+
+  if (panel.childElementCount) content.append(panel);
+}
+
+async function openMemoSource(memoId, version = null) {
+  activeInboxStatus = "confirmed";
+  for (const tab of document.querySelectorAll("[data-inbox-status]")) {
+    const active = tab.dataset.inboxStatus === "confirmed";
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  }
+  showView("받은함", false);
+  if (version !== null) {
+    inboxStatus.hidden = false;
+    inboxStatus.textContent = "고정된 메모 버전을 불러오는 중…";
+    inboxList.replaceChildren();
+    try {
+      const result = await request(
+        `/api/inbox/${encodeURIComponent(memoId)}/versions/${encodeURIComponent(version)}`,
+      );
+      const memoVersion = result.memoVersion;
+      const item = buildInboxItem({
+        id: memoVersion.memoId,
+        currentVersion: memoVersion.version,
+        memo: memoVersion.memo,
+        rawText: memoVersion.rawText,
+        createdAt: memoVersion.createdAt,
+        updatedAt: memoVersion.createdAt,
+        projectionStatus: memoVersion.projectionStatus,
+      });
+      item.classList.add("source-highlight");
+      const pin = document.createElement("p");
+      pin.className = "version-pin-note";
+      pin.textContent = `답변에서 사용한 고정 출처 · memo:${memoVersion.memoId}:v${memoVersion.version}`;
+      item.prepend(pin);
+      inboxList.append(item);
+      inboxStatus.hidden = true;
+    } catch (error) {
+      inboxStatus.textContent = error.message;
+    }
+    return;
+  }
+  await loadInbox();
+  const target = document.querySelector(`#memo-${CSS.escape(memoId)}`);
+  target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  target?.classList.add("source-highlight");
+  if (target) setTimeout(() => target.classList.remove("source-highlight"), 1800);
+}
+
 function facetLabel(kind) {
   return ({ note: "메모", action: "행동", decision: "결정", knowledge: "지식", preference: "선호", open_question: "열린 질문" })[kind] || kind;
 }
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" })[character]);
+}
+
+function formatDateTime(value) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 async function loadDebug() {
@@ -885,3 +1303,4 @@ initializeAi().catch((error) => {
 });
 void loadAssistantSettings();
 void refreshInboxCount();
+void loadProjects();

@@ -1,4 +1,9 @@
 import { InputError } from "./validation.js";
+import {
+  parseProjectProjections,
+  PROJECT_PROJECTION_SCHEMA,
+  type ProjectProjectionDraft,
+} from "./projects.js";
 
 export const MEMO_KINDS = [
   "note",
@@ -37,6 +42,7 @@ export interface MemoProposalDraft {
   targetMemoId: string | null;
   supersedesProposalId: string | null;
   memo: AssistantMemoDraft;
+  projectProjections: ProjectProjectionDraft[];
 }
 
 export interface ProposalResolution {
@@ -44,16 +50,25 @@ export interface ProposalResolution {
   action: ProposalResolutionAction;
 }
 
+export type GroundingStatus = "not_applicable" | "grounded" | "insufficient" | "conflicting";
+
+export interface AssistantTurnGrounding {
+  status: GroundingStatus;
+  citedReferenceIds: string[];
+  conflicts: string[];
+}
+
 export interface AssistantTurnEnvelope {
   reply: string;
   resolutions: ProposalResolution[];
   memoProposal: MemoProposalDraft | null;
+  grounding: AssistantTurnGrounding;
 }
 
 export const ASSISTANT_TURN_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["reply", "resolutions", "memoProposal"],
+  required: ["reply", "resolutions", "memoProposal", "grounding"],
   properties: {
     reply: { type: "string", minLength: 1, maxLength: 12_000 },
     resolutions: {
@@ -75,11 +90,12 @@ export const ASSISTANT_TURN_SCHEMA = {
         {
           type: "object",
           additionalProperties: false,
-          required: ["operation", "targetMemoId", "supersedesProposalId", "memo"],
+          required: ["operation", "targetMemoId", "supersedesProposalId", "memo", "projectProjections"],
           properties: {
             operation: { enum: ["create", "revise"] },
             targetMemoId: { type: ["string", "null"] },
             supersedesProposalId: { type: ["string", "null"] },
+            projectProjections: PROJECT_PROJECTION_SCHEMA,
             memo: {
               type: "object",
               additionalProperties: false,
@@ -130,6 +146,29 @@ export const ASSISTANT_TURN_SCHEMA = {
         },
       ],
     },
+    grounding: {
+      type: "object",
+      additionalProperties: false,
+      required: ["status", "citedReferenceIds", "conflicts"],
+      properties: {
+        status: { enum: ["not_applicable", "grounded", "insufficient", "conflicting"] },
+        citedReferenceIds: {
+          type: "array",
+          maxItems: 100,
+          items: {
+            type: "string",
+            minLength: 1,
+            maxLength: 140,
+            pattern: "^memo:[0-9a-f-]+:v[1-9][0-9]*$",
+          },
+        },
+        conflicts: {
+          type: "array",
+          maxItems: 5,
+          items: { type: "string", minLength: 1, maxLength: 500 },
+        },
+      },
+    },
   },
 } as const;
 
@@ -152,7 +191,34 @@ export function parseAssistantTurnEnvelope(text: string): AssistantTurnEnvelope 
     reply: requireText(record.reply, "reply", 12_000),
     resolutions,
     memoProposal: record.memoProposal === null ? null : parseMemoProposal(record.memoProposal),
+    grounding: parseGrounding(record.grounding),
   };
+}
+
+export function validateGroundingReferences(
+  grounding: AssistantTurnGrounding,
+  availableReferenceIds: string[],
+): void {
+  const available = new Set(availableReferenceIds);
+  const cited = new Set(grounding.citedReferenceIds);
+  if (cited.size !== grounding.citedReferenceIds.length) {
+    throw new InputError("grounding citations must be unique");
+  }
+  if (grounding.citedReferenceIds.some((id) => !available.has(id))) {
+    throw new InputError("grounding cited an unavailable reference");
+  }
+  if (["grounded", "conflicting"].includes(grounding.status) && cited.size === 0) {
+    throw new InputError("grounded answers require at least one citation");
+  }
+  if (["not_applicable", "insufficient"].includes(grounding.status) && cited.size > 0) {
+    throw new InputError("ungrounded answers cannot include citations");
+  }
+  if (grounding.status === "conflicting" && grounding.conflicts.length === 0) {
+    throw new InputError("conflicting answers require a conflict description");
+  }
+  if (grounding.status !== "conflicting" && grounding.conflicts.length > 0) {
+    throw new InputError("only conflicting answers can include conflicts");
+  }
 }
 
 export function formatAssistantTurn(envelope: AssistantTurnEnvelope): string {
@@ -181,6 +247,28 @@ function parseMemoProposal(value: unknown): MemoProposalDraft {
     targetMemoId,
     supersedesProposalId,
     memo: parseMemo(proposal.memo),
+    projectProjections: parseProjectProjections(proposal.projectProjections),
+  };
+}
+
+function parseGrounding(value: unknown): AssistantTurnGrounding {
+  const grounding = requireRecord(value, "grounding");
+  return {
+    status: requireEnum(
+      grounding.status,
+      "grounding status",
+      ["not_applicable", "grounded", "insufficient", "conflicting"],
+    ),
+    citedReferenceIds: requireArray(grounding.citedReferenceIds, "citedReferenceIds", 100)
+      .map((item) => {
+        const referenceId = requireText(item, "cited reference id", 140);
+        if (!/^memo:[0-9a-f-]+:v[1-9][0-9]*$/u.test(referenceId)) {
+          throw new InputError("cited reference id is invalid");
+        }
+        return referenceId;
+      }),
+    conflicts: requireArray(grounding.conflicts, "conflicts", 5)
+      .map((item) => requireText(item, "conflict", 500)),
   };
 }
 

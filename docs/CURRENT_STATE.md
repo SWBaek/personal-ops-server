@@ -8,7 +8,7 @@ The product direction has been reset.
 
 The repository was initially implemented as a small personal task service with optional AI chat. That concept is now superseded. The target is an AI-dependent personal executive office with one chief-assistant front door, specialist roles, a shared evidence-backed operational ledger, typed mutations, receipts, and proactive follow-up.
 
-The running application now presents the accepted baseline information architecture for the target product experience. Its responsive shell represents the intended hierarchy, but most operational content is visibly marked example data and is not yet backed by the target domain model.
+The running application now presents the accepted information architecture and the first real operational object view. Projects are backed by confirmed, source-version-pinned application data; schedule, knowledge, review, receipts, and most contextual summaries remain future work.
 
 ## Reusable foundation already working
 
@@ -28,6 +28,13 @@ The running application now presents the accepted baseline information architect
 - A responsive Project Overview tab that explains the product purpose, professional-assistant roles, intended capabilities, AI contract, shared data classes, boundaries, and roadmap.
 - A structured conversational capture pipeline that proposes one integrated assistant memo from incomplete natural language and accepts confirmation, correction, or rejection through conversation.
 - Confirmed assistant memos with preserved source wording, immutable revisions, and a responsive Inbox view.
+- Rebuildable SQLite FTS5 retrieval over confirmed memo current versions, with bounded source/interpretation context packages.
+- Grounded, insufficient, and conflicting answer states with server-validated memo citations and browser-safe Inbox links.
+- Sequential `PRAGMA user_version` migrations that preserve existing databases and classify pre-project memos as `unprojected`.
+- Reviewed `projectProjections` on memo proposals and versions, stable projects with normalized aliases, and source-pinned rebuildable project/action/decision/dependency/risk/meeting/judgment snapshots.
+- Deterministic `RetrievalPlan` generation, exact longest alias resolution, SQL project readers, FTS fallback, persisted retrieval runs/candidates, and server-owned `unknown`/`partial`/`complete` coverage.
+- Structured project briefs with fixed sections, exact `memo:<id>:v<version>` references, reload-stable message JSON, and closed-world claim protection when coverage is incomplete.
+- Real read-only Projects APIs and a responsive Projects view: desktop list/detail panes, tablet and phone list-to-detail navigation, coverage banners, briefing prompts, and version-pinned source navigation.
 - An allowlisted read-only Debug view for inspecting SQLite conversations, messages, jobs, proposals, memos, versions, captures, and tasks without exposing provider internals.
 - A Project Overview process map that identifies the AI judgment policy, bounded context inputs, validation contract, and transactional storage path.
 - Playwright Chromium coverage for the three device classes, context-drawer behavior, streaming, reload recovery, and browser API fallback.
@@ -38,10 +45,10 @@ The running application now presents the accepted baseline information architect
 ## Transitional or superseded product behavior
 
 - Capture and Task APIs remain in the backend but are no longer the visual center.
-- AI can propose and resolve assistant memos but cannot retrieve grounded project or knowledge context or mutate those future domains.
+- AI can retrieve grounded project-domain state but cannot mutate project or future operational domains.
 - The primary/secondary assistant-slot schema remains transitional backend state; the UI presents one chief assistant.
-- The briefing, project progress, approval, and recent-activity content in the new shell is labeled prototype data rather than canonical state.
-- Projects, people, meetings, decisions, dependencies, risks, knowledge artifacts, evidence provenance, receipts, and corrections do not exist in the application domain.
+- Schedule, knowledge, review, receipts, and proactive context surfaces are not yet backed by their target domains.
+- People, standalone event/meeting workflows, knowledge artifacts, richer evidence provenance, receipts, and corrections do not exist in the application domain.
 - Current project documentation previously required useful operation without AI; that requirement is superseded.
 - No legacy WorkOS vault is required or connected. This is the intended default, not a missing runtime dependency.
 
@@ -51,11 +58,11 @@ Do not expand these transitional behaviors as if they were the target architectu
 
 - chief-assistant orchestration;
 - specialist role execution;
-- goal-specific context building;
+- schedule, knowledge, and cross-domain context building beyond the project reader;
 - typed agent domain tools;
 - shared operational ledger beyond primitive tasks;
-- evidence ingestion and provenance;
-- project, meeting, person, decision, dependency, risk, and knowledge models;
+- evidence ingestion beyond confirmed conversational text;
+- standalone event, person, meeting, and knowledge models;
 - optional historical-source adapters, including a possible WorkOS importer;
 - proposal, approval, receipt, correction, and undo workflows;
 - durable scheduled assistant goals;
@@ -64,30 +71,31 @@ Do not expand these transitional behaviors as if they were the target architectu
 
 ## Verification baseline
 
-The last implementation verification on Windows with Node.js 24.18.0 passed on 2026-07-23:
+The project-read implementation verification on Windows with Node.js 24 passed on 2026-07-23:
 
 - `npm run verify`;
-- 38 unit/integration tests and 16 Playwright tests;
+- 48 unit/integration tests and 19 Playwright tests;
 - TypeScript production build;
 - `npm audit --audit-level=moderate` with zero reported vulnerabilities;
 - local health endpoint and tailnet-served page;
-- live streaming requests from Codex and Grok.
+- provider-independent RetrievalPlan and manifest fixtures for Codex and Grok;
+- visual Projects verification at desktop, Galaxy Tab, and smartphone viewports.
 
-This evidence validates the current infrastructure only. It does not validate the refounded assistant workflows.
+This evidence validates the conversational project creation, deterministic retrieval, structured brief, version-pinned source, reset, migration, and responsive Projects workflows. It does not validate future mutations or other domains.
 
 ## Current UI milestone
 
-The product constitution and first responsive information architecture now point in the same direction. The browser places one chief-assistant conversation at the center, keeps model controls secondary, exposes operational context without requiring it to occupy the phone viewport, and provides a Project Overview reference from desktop and mobile navigation. No legacy WorkOS data is connected or required.
+The browser now completes one project-manager read loop: provide project facts, confirm the integrated memo proposal, inspect the created project, ask for a fixed-section brief, review coverage and version-pinned sources, reload the same structured answer, and open the exact historical Inbox version. Missing, unresolved, filtered, and truncated evidence remain inspectable. No legacy WorkOS data is connected or required.
 
 ## Recommended next milestone
 
-Build one grounded chief-assistant question workflow over confirmed conversational material:
+Extend the accepted retrieval/projection foundation to schedule:
 
-1. index confirmed source wording and assistant memo fields with rebuildable SQLite FTS;
-2. retrieve a small set of relevant memo versions for one explicit topic;
-3. build a bounded context package that keeps source wording separate from assistant interpretation;
-4. let the chief assistant answer with browser-safe links back to Inbox records;
-5. report missing or conflicting evidence rather than inventing project state;
-6. verify retrieval with synthetic fixtures before introducing project-domain mutation.
+1. define event projection and source-version provenance;
+2. interpret relative dates in the owner’s stored IANA timezone;
+3. distinguish point events, ranges, recurrence, and exceptions;
+4. persist deterministic schedule retrieval plans and coverage;
+5. render the same essential schedule workflow on desktop, Galaxy Tab, and smartphone;
+6. keep it read-only until its context contract is accepted.
 
 See `docs/ASSISTANT_SYSTEM_REFOUNDATION.md` for the staged plan and acceptance criteria.

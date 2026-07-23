@@ -134,6 +134,34 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     return { memo, versions: options.store.listAssistantMemoVersions(memo.id) };
   });
 
+  app.get<{ Params: { id: string; version: string } }>(
+    "/api/inbox/:id/versions/:version",
+    async (request, reply) => {
+      if (!/^[1-9]\d*$/u.test(request.params.version)) {
+        throw new InputError("version must be a positive integer");
+      }
+      const version = Number.parseInt(request.params.version, 10);
+      if (!Number.isSafeInteger(version)) {
+        throw new InputError("version must be a positive integer");
+      }
+      const memoVersion = options.store.getAssistantMemoVersion(request.params.id, version);
+      if (!memoVersion) {
+        return reply.code(404).send({ error: "해당 비서 메모 버전을 찾을 수 없습니다." });
+      }
+      return { memoVersion };
+    },
+  );
+
+  app.get("/api/projects", async () => ({
+    projects: options.store.listProjects(),
+  }));
+
+  app.get<{ Params: { id: string } }>("/api/projects/:id", async (request, reply) => {
+    const brief = options.store.getProjectBrief(request.params.id);
+    if (!brief) return reply.code(404).send({ error: "프로젝트를 찾을 수 없습니다." });
+    return { brief };
+  });
+
   app.get("/api/debug/summary", async () => ({
     summary: options.store.debugSummary(),
   }));

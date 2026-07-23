@@ -115,6 +115,8 @@ test("browser UI centers one chief assistant with supporting operational context
     assert.match(response.body, /<section id="assistant-view" class="conversation" aria-label="주 비서 대화">/);
     assert.match(response.body, /data-view="프로젝트 개요"/);
     assert.match(response.body, /id="project-overview"/);
+    assert.match(response.body, /data-view="프로젝트"/);
+    assert.match(response.body, /id="projects-view"/);
     assert.match(response.body, /data-view="받은함"/);
     assert.match(response.body, /id="inbox-view"/);
     assert.match(response.body, /data-view="디버그"/);
@@ -154,6 +156,7 @@ test("assistant profile API requires explicit confirmation and exposes no runtim
     const initial = await app.inject({ method: "GET", url: "/api/assistant/profile" });
     assert.equal(initial.statusCode, 200);
     assert.equal(initial.json().profile.version, 1);
+    assert.equal(typeof initial.json().profile.timezone, "string");
 
     const denied = await app.inject({
       method: "PUT",
@@ -195,6 +198,37 @@ test("assistant profile API requires explicit confirmation and exposes no runtim
       runtime: { environment: "development", mode: "managed", isolated: true },
     });
     assert.equal(JSON.stringify(runtime.json()).includes("workingDirectory"), false);
+  } finally {
+    await app.close();
+    store.close();
+  }
+});
+
+test("project and version-pinned source APIs fail closed for unknown records", async () => {
+  const store = new OpsStore(":memory:");
+  const app = await buildApp({ store });
+  try {
+    const projects = await app.inject({ method: "GET", url: "/api/projects" });
+    assert.equal(projects.statusCode, 200);
+    assert.deepEqual(projects.json().projects, []);
+
+    const project = await app.inject({
+      method: "GET",
+      url: "/api/projects/00000000-0000-4000-8000-000000000001",
+    });
+    assert.equal(project.statusCode, 404);
+
+    const version = await app.inject({
+      method: "GET",
+      url: "/api/inbox/00000000-0000-4000-8000-000000000001/versions/1",
+    });
+    assert.equal(version.statusCode, 404);
+
+    const malformedVersion = await app.inject({
+      method: "GET",
+      url: "/api/inbox/00000000-0000-4000-8000-000000000001/versions/1-extra",
+    });
+    assert.equal(malformedVersion.statusCode, 400);
   } finally {
     await app.close();
     store.close();

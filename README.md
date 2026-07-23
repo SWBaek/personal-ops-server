@@ -8,7 +8,7 @@ AI is required for intelligent operation. Inference uses only official locally i
 
 ## Refoundation status
 
-The repository contains an accepted responsive chief-assistant shell plus a working technical foundation built around SQLite and durable AI conversations. Conversational capture now proposes one integrated assistant memo from incomplete natural language, confirms it through dialogue, and exposes pending or saved material in Inbox. The target product is summarized in [PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) and defined in detail by [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
+The repository contains an accepted responsive chief-assistant shell and the first real project-read workflow. Conversational capture proposes an integrated assistant memo with reviewed project projections; confirmation creates source-version-pinned project read models that can be inspected in Projects and used for deterministic, coverage-aware briefs. The target product is summarized in [PRODUCT_OVERVIEW.md](docs/PRODUCT_OVERVIEW.md) and defined in detail by [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
 
 Reusable foundation:
 
@@ -17,15 +17,18 @@ Reusable foundation:
 - durable Codex and Grok CLI jobs;
 - an application-managed AI runtime outside the development repository;
 - a versioned owner-configured chief-assistant profile;
+- sequential SQLite migrations, rebuildable memo FTS, and retrieval audit records;
+- stable project identities, aliases, source-pinned snapshots, and structured project briefs;
 - streaming, cancellation, concurrency limits, and restart recovery;
-- a responsive desktop, Galaxy Tab, and smartphone UI;
+- a responsive desktop, Galaxy Tab, and smartphone UI with real Projects list/detail navigation;
 - an in-product project overview of the product constitution;
 - Playwright verification and development data-reset controls.
 
 Not yet implemented:
 
 - chief-assistant orchestration and specialist roles;
-- shared project, meeting, decision, people, risk, evidence, and knowledge models;
+- schedule, standalone meeting, people, and durable knowledge workflows;
+- cross-domain retrieval beyond the project reader;
 - optional historical-data import adapters, including a possible read-only WorkOS adapter;
 - typed agent mutations, receipts, corrections, and undo;
 - proactive scheduled assistant work.

@@ -24,7 +24,7 @@ The navigation includes a user-facing Project Overview that summarizes the produ
 
 The owner may clear all AI conversation history or reset all current application data from the settings UI. Both are destructive Govern operations: they require a separate final confirmation step, reject deletion while an AI job is queued or running, and execute as a database transaction. Typed confirmation is deferred while rapid development resets are frequent.
 
-Conversation clearing affects only assistant conversations, messages, and job records. Full reset additionally clears current capture and task records. Neither operation touches CLI authentication, environment configuration, Tailscale configuration, source files, or data outside the application-owned SQLite schema. The reset implementation must be updated explicitly when new canonical tables are introduced.
+Conversation clearing affects assistant conversations, messages, jobs, proposals, message sources, and retrieval audit records; confirmed memos, projects, aliases, projections, snapshots, and the owner profile remain. Full reset additionally clears all application-owned capture, task, memo, project, projection, snapshot, and retrieval state, then restores the default profile. Neither operation touches CLI authentication, environment configuration, Tailscale configuration, source files, or data outside the application-owned SQLite schema. The reset implementation must be updated explicitly when new canonical tables are introduced.
 
 ## 2026-07-22 — Keep legacy WorkOS optional and independent
 
@@ -84,13 +84,33 @@ Every committed agent mutation produces a receipt and bounded undo path. Destruc
 
 Every owner turn passes through a structured chief-assistant interpretation, but only turns with durable information produce one integrated memo proposal. The owner confirms, corrects, or rejects that proposal through natural language rather than form controls. A confirmed memo preserves the original wording, structured facets, uncertainty, and immutable revision history independently of conversation history.
 
-This milestone does not create project, schedule, task, decision, or knowledge-domain records. It establishes the interpretation and confirmation boundary those later typed mutations will reuse.
+This milestone did not create project, schedule, task, decision, or knowledge-domain records. It established the interpretation and confirmation boundary reused by the later project-read decision below.
 
 ## 2026-07-23 — Allowlisted read-only database debugging
 
 Development needs an inspectable path from natural-language conversation to SQLite state. The browser Debug view may read only fixed application datasets selected by server code. It does not accept SQL, table names outside the allowlist, filesystem paths, or mutation commands.
 
 Conversation content, proposals, and memo data are visible because they are the object of debugging. CLI credentials, provider thread identifiers, client request keys, database paths, and arbitrary SQLite metadata remain excluded from browser responses.
+
+## 2026-07-23 — Rebuildable memo retrieval and validated answer citations
+
+**Status: Active**
+
+Confirmed assistant memo current versions are indexed in an application-owned SQLite FTS5 table. The index is derived state: it is rebuilt from canonical memo versions at startup and is deleted without deleting the source memos during a full reset.
+
+General questions retrieve at most five matching current memo versions. Project questions with an exact resolved project use the structured SQL reader below and are not subject to the FTS top-five limit. The context package keeps the owner’s source excerpt separate from the assistant interpretation and marks both as untrusted data. The model must classify the answer as grounded, insufficient, conflicting, or not applicable and may cite only exact `memo:<id>:v<version>` references in that package. The server rejects unavailable or superseded references and persists accepted references in `ai_message_sources` so browser links and reloads do not depend on provider memory.
+
+## 2026-07-23 — Confirmed project projections and server-owned retrieval coverage
+
+**Status: Active**
+
+A confirmed conversational memo may carry up to four reviewed project projections. Confirmation creates or revises stable projects, normalized aliases, and rebuildable source-version-pinned snapshots for outcome, state, actions, decisions, dependencies, risks, meetings, and owner judgments in the same transaction. Alias collisions do not block the memo; they leave only the projection unresolved. Existing memos are preserved as `unprojected` and are never silently reanalyzed.
+
+Project questions use a deterministic `RetrievalPlan`. Exact longest project-name or alias matching selects a project; ambiguous or unresolved references fail closed. Once selected, SQL reads every current relevant snapshot and its source version. FTS remains a derived discovery fallback for unstructured evidence and cannot establish exhaustive coverage.
+
+Coverage is a server-owned audit property persisted with the plan, candidate decisions, as-of time, and owner timezone. It is `unknown` without a resolved project, `partial` when projection failures, unresolved material, or truncation remain, and `complete` only after every current memo is classified and every relevant current snapshot is read without truncation. Model output cannot promote coverage, and incomplete coverage cannot support closed-world claims.
+
+The first Projects surface is read-only. It renders a fixed-section brief from validated server state, retains the brief and retrieval run on the message, and links material items to exact historical memo versions. SQLite remains the canonical store; no vector database or model API is introduced.
 
 ## 2026-07-22 — Private remote access
 

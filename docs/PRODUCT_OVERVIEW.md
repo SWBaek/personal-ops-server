@@ -62,11 +62,12 @@ The proposal is confirmed through ordinary conversation. The owner may say the e
 ### How one turn is processed
 
 1. The original turn and durable AI job are stored in `ai_messages` and `ai_jobs`.
-2. The application builds a bounded context from recent messages, pending proposals, and recent confirmed memos.
+2. The application builds a deterministic `RetrievalPlan`. An exact normalized project name or alias selects the project SQL reader; unresolved and general questions may use bounded SQLite FTS5 memo candidates.
 3. The active versioned chief-assistant profile is added beneath immutable system policy, then Codex or Grok judges whether the turn has durable value, which memo facets it contains, what remains uncertain, and whether the owner is resolving an existing proposal.
 4. `src/domain/intake.ts` validates the provider result against the fixed `AssistantTurnEnvelope` schema.
-5. `src/infra/store.ts` applies confirmed resolutions and creates proposals or immutable memo versions in one SQLite transaction.
-6. Inbox and the read-only Debug view expose the application-owned result.
+5. The server validates version-pinned `memo:<id>:v<version>` references, owns coverage classification, and persists the retrieval run, candidate decisions, accepted sources, and any structured project brief.
+6. `src/infra/store.ts` applies confirmed resolutions and creates immutable memo versions plus reviewed project projections in one SQLite transaction.
+7. Answer source chips link back to Inbox records, while Inbox and the read-only Debug view expose the application-owned result.
 
 The model does not browse repository files to make this judgment. `src/ai/streaming-service.ts` supplies the fixed interpretation policy, owner profile, and bounded application context, while `src/domain/intake.ts` constrains the output. The web-triggered runtime uses an operating-system-managed directory outside Git repositories and has no inherited developer `AGENTS.md`, application domain tools, repository mount, personal-folder scope, WorkOS access, database handle, web search, MCP, or sub-agent delegation.
 
@@ -150,11 +151,11 @@ SQLite is the initial canonical operational store. Full-text search, embeddings,
 
 ## Current state
 
-The responsive assistant shell, private Tailscale access, durable CLI conversations, structured conversational capture, confirmed assistant memos with revision history, Inbox inspection, SQLite jobs, cancellation, development reset controls, and browser verification are working. Operational overview content remains marked as prototype data because shared project state, grounded retrieval, typed agent tools, receipts, and specialist workflows are not yet implemented.
+The responsive assistant shell, private Tailscale access, durable CLI conversations, structured conversational capture, confirmed memo revision history, sequential SQLite migrations, FTS fallback retrieval, deterministic project resolution, project snapshots, retrieval audit, structured project briefs, version-pinned citations, a real Projects view, jobs, cancellation, reset controls, and three-device browser verification are working. Project data is created only through confirmed conversational proposals and is read-only in the first slice.
 
 The next vertical slice is:
 
-> search confirmed source text and assistant memos → build a bounded context → receive a chief-assistant answer with citations.
+> add schedule event projections with timezone-aware relative dates, ranges, recurrence, and exceptions on the same retrieval and provenance foundation.
 
 ## Success signals
 

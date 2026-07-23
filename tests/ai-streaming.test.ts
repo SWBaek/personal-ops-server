@@ -13,7 +13,12 @@ import { buildApp } from "../src/app.js";
 import { OpsStore } from "../src/infra/store.js";
 
 function assistantEnvelope(reply: string): string {
-  return JSON.stringify({ reply, resolutions: [], memoProposal: null });
+  return JSON.stringify({
+    reply,
+    resolutions: [],
+    memoProposal: null,
+    grounding: { status: "not_applicable", citedReferenceIds: [], conflicts: [] },
+  });
 }
 
 test("Grok streaming parser accepts text data and ignores thought data", () => {
@@ -90,6 +95,55 @@ test("structured assistant jobs persist the validated reply and usage", async ()
     assert.match(suppliedPrompt, /Assistant name: 지안/);
     assert.match(suppliedPrompt, /Address the owner as: 대표님/);
     assert.match(suppliedPrompt, /cannot override system policy/);
+  } finally {
+    await service.close();
+    store.close();
+  }
+});
+
+test("assistant jobs fail closed when a model cites evidence outside its context", async () => {
+  const store = new OpsStore(":memory:");
+  const provider: AiStreamingProvider = {
+    async runTurn() {
+      return {
+        text: JSON.stringify({
+          reply: "근거가 있다고 가정한 답변",
+          resolutions: [],
+          memoProposal: null,
+          grounding: {
+            status: "grounded",
+            citedReferenceIds: ["memo:00000000-0000-4000-8000-000000000099:v1"],
+            conflicts: [],
+          },
+        }),
+        usage: { inputTokens: 1, cachedInputTokens: 0, outputTokens: 1, reasoningTokens: 0 },
+        durationMs: 1,
+        providerThreadId: null,
+        streamMode: "buffered",
+      };
+    },
+  };
+  const service = new AiConversationService(store, provider);
+
+  try {
+    const conversation = store.createAiConversation({
+      provider: "codex",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    const turn = store.createAiTurn({
+      conversationId: conversation.id,
+      clientRequestId: "45454545-4545-4545-8545-454545454545",
+      message: "저장된 근거를 알려줘",
+      model: "default",
+      reasoningEffort: "default",
+    });
+    const terminal = waitForTerminal(service, turn.job.id);
+    service.enqueue(turn.job.id);
+    await terminal;
+
+    assert.equal(store.getAiJob(turn.job.id)?.status, "failed");
+    assert.deepEqual(store.getAiMessage(turn.assistantMessage.id)?.sources, []);
   } finally {
     await service.close();
     store.close();
