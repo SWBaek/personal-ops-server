@@ -25,7 +25,12 @@ createGitWorkspace(vault);
 
 const provider: WorkspaceProvider = {
   async answer(input: WorkspaceProviderInput): Promise<string> {
-    await delay(80, input.signal);
+    const startedAt = new Date().toISOString();
+    input.onProgress?.({ type: "started", at: startedAt });
+    input.onProgress?.({ type: "signal", at: startedAt, phase: "checking_workos" });
+    await delay(input.message.includes("느린") ? 1_500 : 80, input.signal);
+    input.onProgress?.({ type: "signal", at: new Date().toISOString(), phase: "composing" });
+    input.onProgress?.({ type: "stopped", at: new Date().toISOString() });
     if (input.message.includes("Markdown")) {
       return [
         "## 프로젝트 요약",

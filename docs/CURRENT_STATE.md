@@ -22,6 +22,7 @@ The WorkOS-native first vertical slice is implemented:
 - application-owned local Git commits, receipts, diffs, and latest-receipt Undo;
 - durable SQLite conversation, job, activity, profile, configuration, and receipt state;
 - restart recovery, cancellation, provider concurrency guards, and idempotent turns;
+- safe CLI process liveness, provider-signal age, five-second SSE updates, reconnect, and reload recovery;
 - responsive desktop, Galaxy Tab, and smartphone UI;
 - localhost and private Tailscale deployment boundary.
 
@@ -53,6 +54,7 @@ Synthetic tests cover:
 - explicit model arguments in direct-answer, planning, and execution invocations;
 - Grok multi-turn read-only tool use and final-answer extraction from streaming events;
 - rejection of unterminated progress-only, max-turn, and missing-completion provider output.
+- split UTF-8/JSONL progress parsing without provider body, tool argument, path, or stderr disclosure;
 
 Live verification must use read-only questions against the owner’s configured WorkOS when it contains pre-existing changes. Repository tests never read personal WorkOS data.
 

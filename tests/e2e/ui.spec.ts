@@ -57,6 +57,56 @@ test("one-call read-only answer bypasses a plan and survives reload", async ({ p
   await expect(page.locator("#messages")).toContainText("등록된 일정이 없습니다");
 });
 
+test("progress card and cancellation work on desktop, Galaxy Tab, and phone", async ({ page }) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  for (const viewport of [
+    { width: 1440, height: 720 },
+    { width: 800, height: 900 },
+    { width: 390, height: 700 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.locator("#message-input").fill(`느린 상태 확인 ${viewport.width}`);
+    await page.locator("#send-button").click();
+    const card = page.locator(".message.assistant").last().locator(".progress-card");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText(/시작 중|실행 중/u);
+    await expect(card).toContainText("현재 단계");
+    await expect(card).toContainText("CLI 프로세스");
+    await expect(card).toContainText("실시간 연결");
+    await expect(page.locator("#cancel-button")).toBeVisible();
+    const width = await card.evaluate((element) => element.getBoundingClientRect().right);
+    expect(width).toBeLessThanOrEqual(viewport.width);
+    await page.locator("#cancel-button").click();
+    await expect(page.locator("#send-button")).toBeEnabled();
+  }
+});
+
+test("reload re-subscribes to a pending job and preserves completion", async ({ page }) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator("#message-input").fill("느린 새로고침 상태 확인");
+  await page.locator("#send-button").click();
+  await expect(page.locator(".progress-card")).toBeVisible();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator(".progress-card")).toBeVisible();
+  await expect(page.locator("#cancel-button")).toBeVisible();
+  await expect(page.locator(".message.assistant").last()).toContainText("합성 WorkOS를 직접 읽고 답변했습니다.");
+  await expect(page.locator(".message.assistant").last().locator(".run-details")).toBeVisible();
+});
+
+test("provider silence is informational until the existing timeout", async ({ page }) => {
+  await page.clock.install();
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator("#message-input").fill("느린 무신호 상태 확인");
+  await page.locator("#send-button").click();
+  const card = page.locator(".message.assistant").last().locator(".progress-card");
+  await expect(card).toContainText("실행 중");
+  await page.clock.fastForward("00:16");
+  await expect(card).toContainText("조용히 처리 중");
+  await page.clock.fastForward("00:45");
+  await expect(card).toContainText("응답 지연");
+  await expect(page.locator("#cancel-button")).toBeVisible();
+});
+
 test("assistant Markdown is readable, sanitized, and contained on every viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/", { waitUntil: "networkidle" });

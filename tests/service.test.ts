@@ -44,6 +44,11 @@ class FakeProvider implements WorkspaceProvider {
   async answer(_input: WorkspaceProviderInput): Promise<string> {
     this.answerCalls += 1;
     if (this.answerError) throw this.answerError;
+    const now = new Date().toISOString();
+    _input.onProgress?.({ type: "started", at: now });
+    _input.onProgress?.({ type: "signal", at: now, phase: "checking_workos" });
+    _input.onProgress?.({ type: "signal", at: now, phase: "composing" });
+    _input.onProgress?.({ type: "stopped", at: now });
     return this.answerResult;
   }
 
@@ -119,6 +124,31 @@ test("incomplete provider output fails durably instead of completing the message
     assert.equal(message.status, "failed");
     assert.equal(message.content, "AI provider returned no usable answer");
     assert.match(job.error!, /no usable answer/u);
+    await service.close();
+  } finally {
+    fixture.close();
+  }
+});
+
+test("provider liveness persists safe phases without accumulating heartbeats", async () => {
+  const fixture = setupFixture();
+  try {
+    const provider = new FakeProvider(plan({ mode: "observe" }));
+    const service = new AiConversationService(fixture.store, provider, fixture.workspace);
+    const jobId = createTurn(fixture.store, fixture.conversationId, "운영 상태를 확인해");
+    service.enqueue(jobId);
+    await waitFor(() => fixture.store.getAiJob(jobId)?.status === "succeeded");
+
+    const liveness = service.liveness(jobId)!;
+    assert.equal(liveness.processState, "stopped");
+    assert.equal(liveness.phase, "composing");
+    assert.ok(liveness.startedAt);
+    assert.ok(liveness.lastProviderSignalAt);
+    assert.ok(liveness.timeoutAt);
+    const activity = fixture.store.listActivity(jobId);
+    assert.equal(activity.filter((event) => event.summary.includes("단계로 전환")).length, 2);
+    const serialized = JSON.stringify({ liveness, activity });
+    assert.doesNotMatch(serialized, /stderr|toolArgs|private[\\/]/u);
     await service.close();
   } finally {
     fixture.close();

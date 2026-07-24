@@ -54,6 +54,14 @@ test("stores configuration, one conversation, idempotent turns, and provider seg
     });
     assert.equal(duplicate.duplicate, true);
     assert.equal(duplicate.job.id, first.job.id);
+    const signalAt = new Date().toISOString();
+    store.updateProviderProgress(first.job.id, {
+      providerStartedAt: signalAt,
+      lastProviderSignalAt: signalAt,
+      currentPhase: "checking_workos",
+    });
+    assert.equal(store.getAiJob(first.job.id)!.currentPhase, "checking_workos");
+    assert.equal(store.listActivity(first.job.id).length, 0);
     store.transitionJob(first.job.id, "succeeded", { content: "답변", error: null });
 
     const switched = store.switchConversationProvider(conversation.id, {
@@ -100,7 +108,7 @@ test("migrates legacy default model rows to explicit provider models", () => {
     const inspected = new DatabaseSync(databasePath);
     assert.equal(
       (inspected.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-      2,
+      3,
     );
     inspected.close();
   } finally {
@@ -133,6 +141,40 @@ test("profile changes are versioned and workspace proposals fail closed", () => 
     assert.throws(() => store.confirmWorkspaceConfigProposal(invalid.id), /invalid/u);
   } finally {
     store.close();
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("restart recovery marks active liveness jobs interrupted", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "ops-store-recovery-"));
+  const databasePath = join(temporary, "runtime.db");
+  const store = new OpsStore(databasePath);
+  const conversation = store.createAiConversation({
+    provider: "codex",
+    model: "gpt-5.6-sol",
+    reasoningEffort: "high",
+  });
+  const job = store.createAiTurn({
+    conversationId: conversation.id,
+    clientRequestId: crypto.randomUUID(),
+    message: "synthetic recovery",
+    model: "gpt-5.6-sol",
+    reasoningEffort: "high",
+  }).job;
+  store.transitionJob(job.id, "planning");
+  store.updateProviderProgress(job.id, {
+    providerStartedAt: new Date().toISOString(),
+    currentPhase: "checking_workos",
+  });
+  store.close();
+
+  const recovered = new OpsStore(databasePath);
+  try {
+    assert.equal(recovered.recoverInterruptedJobs(), 1);
+    assert.equal(recovered.getAiJob(job.id)!.status, "interrupted");
+    assert.equal(recovered.getAiMessage(job.assistantMessageId)!.status, "failed");
+  } finally {
+    recovered.close();
     rmSync(temporary, { recursive: true, force: true });
   }
 });
