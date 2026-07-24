@@ -42,6 +42,9 @@ test("read-only planning answers and survives reload", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await page.locator("#message-input").fill("오늘 일정은?");
   await page.locator("#send-button").click();
+  const userBubble = page.locator(".message.user").last().locator(".message-bubble");
+  await expect(userBubble).toContainText("오늘 일정은?");
+  await expect(userBubble).not.toContainText("??");
   await expect(page.locator(".message.assistant").last()).toContainText("등록된 일정이 없습니다");
   await expect(page.locator("#composer-status")).toHaveText("완료했습니다.");
   await page.reload({ waitUntil: "networkidle" });
@@ -89,4 +92,35 @@ test("provider switch keeps one timeline and marks the provider segment", async 
   await page.locator("#message-input").fill("오늘 일정은?");
   await page.locator("#send-button").click();
   await expect(page.locator(".message.assistant").last().locator(".message-meta")).toContainText("grok");
+});
+
+test("conversation owns vertical scrolling on desktop, tablet, and phone", async ({ page }) => {
+  for (const viewport of [
+    { width: 1440, height: 720 },
+    { width: 800, height: 900 },
+    { width: 390, height: 700 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/", { waitUntil: "networkidle" });
+    const conversation = page.locator("#conversation");
+    const metrics = await page.evaluate<{
+      clientHeight: number;
+      scrollHeight: number;
+      overflowY: string;
+      pageHeight: number;
+      viewportHeight: number;
+    }>(
+      "(() => { const element = document.querySelector('#conversation'); return { clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY, pageHeight: document.documentElement.scrollHeight, viewportHeight: window.innerHeight }; })()",
+    );
+    expect(metrics.overflowY).toBe("auto");
+    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+    expect(metrics.pageHeight).toBeLessThanOrEqual(metrics.viewportHeight);
+
+    await conversation.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await conversation.hover();
+    await page.mouse.wheel(0, 500);
+    await expect.poll(() => conversation.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  }
 });
