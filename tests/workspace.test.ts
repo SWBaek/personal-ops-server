@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { buildInvocation } from "../src/ai/workspace-provider.js";
+import { buildInvocation, parseProviderJson } from "../src/ai/workspace-provider.js";
 import {
   enforceWorkspaceRisk,
   parseWorkspacePlan,
@@ -97,4 +97,34 @@ test("provider invocations discover WorkOS instructions and separate plan from w
   const execute = buildInvocation({ ...base, write: true, capabilities: ["local"] });
   assert.ok(execute.args.includes("workspace-write"));
   assert.ok(execute.args.includes("-C"));
+});
+
+test("Grok parser accepts one structured object with provider framing or trailing prose", () => {
+  assert.deepEqual(
+    parseProviderJson("grok", JSON.stringify({
+      text: "```json\n{\"answer\":\"brace } inside a string\"}\n```",
+    })),
+    { answer: "brace } inside a string" },
+  );
+  assert.deepEqual(
+    parseProviderJson("grok", JSON.stringify({
+      text: "{\"answer\":\"ok\"}\nAdditional provider commentary.",
+    })),
+    { answer: "ok" },
+  );
+});
+
+test("provider parser rejects malformed or ambiguous structured output with a safe error", () => {
+  assert.throws(
+    () => parseProviderJson("grok", JSON.stringify({ text: "{\"answer\":" })),
+    /AI provider returned an invalid structured result/u,
+  );
+  assert.throws(
+    () => parseProviderJson("grok", JSON.stringify({ text: "{\"answer\":1}{\"answer\":2}" })),
+    /AI provider returned an invalid structured result/u,
+  );
+  assert.throws(
+    () => parseProviderJson("grok", "not outer JSON"),
+    /AI provider returned an invalid structured result/u,
+  );
 });

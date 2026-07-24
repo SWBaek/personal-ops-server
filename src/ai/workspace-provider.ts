@@ -239,30 +239,70 @@ function runInvocation(
   });
 }
 
-function parseProviderJson(provider: AiProviderId, output: string): unknown {
-  if (provider === "grok") {
-    const result = JSON.parse(output) as unknown;
-    if (isRecord(result) && typeof result.text === "string") {
-      return JSON.parse(result.text) as unknown;
+export function parseProviderJson(provider: AiProviderId, output: string): unknown {
+  try {
+    if (provider === "grok") {
+      const result = JSON.parse(output) as unknown;
+      if (isRecord(result) && typeof result.text === "string") {
+        return parseFirstJsonObject(result.text);
+      }
+      return result;
     }
-    return result;
+    let finalText: string | null = null;
+    for (const line of output.split(/\r?\n/u)) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as unknown;
+      if (
+        isRecord(event)
+        && event.type === "item.completed"
+        && isRecord(event.item)
+        && event.item.type === "agent_message"
+        && typeof event.item.text === "string"
+      ) {
+        finalText = event.item.text;
+      }
+    }
+    if (!finalText) throw new Error("missing structured result");
+    return parseFirstJsonObject(finalText);
+  } catch {
+    throw new AiChatError("AI provider returned an invalid structured result", 502);
   }
-  let finalText: string | null = null;
-  for (const line of output.split(/\r?\n/u)) {
-    if (!line.trim()) continue;
-    const event = JSON.parse(line) as unknown;
-    if (
-      isRecord(event)
-      && event.type === "item.completed"
-      && isRecord(event.item)
-      && event.item.type === "agent_message"
-      && typeof event.item.text === "string"
-    ) {
-      finalText = event.item.text;
+}
+
+function parseFirstJsonObject(value: string): unknown {
+  const start = value.indexOf("{");
+  if (start < 0) throw new Error("structured result has no JSON object");
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < value.length; index += 1) {
+    const character = value[index]!;
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (character === "\"") {
+      inString = true;
+    } else if (character === "{") {
+      depth += 1;
+    } else if (character === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        const trailing = value.slice(index + 1).trim().replace(/^```(?:\s*)/u, "").trim();
+        if (trailing.startsWith("{") || trailing.startsWith("[")) {
+          throw new Error("structured result contains multiple JSON values");
+        }
+        return JSON.parse(value.slice(start, index + 1)) as unknown;
+      }
     }
   }
-  if (!finalText) throw new AiChatError("Codex returned no structured result", 502);
-  return JSON.parse(finalText) as unknown;
+  throw new Error("structured result has an incomplete JSON object");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
