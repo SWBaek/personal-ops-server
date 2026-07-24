@@ -1,349 +1,97 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
+import { GitWorkspace } from "../src/infra/git-workspace.js";
 import { OpsStore } from "../src/infra/store.js";
+import { createGitWorkspace } from "./helpers.js";
 
-test("captures are stored newest first", () => {
-  const store = new OpsStore(":memory:");
+test("stores configuration, one conversation, idempotent turns, and provider segments", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "ops-store-"));
+  const vault = join(temporary, "vault");
+  createGitWorkspace(vault);
+  const store = new OpsStore(join(temporary, "runtime.db"));
   try {
-    const first = store.createCapture("first");
-    const second = store.createCapture("second");
-    assert.deepEqual(
-      store.listCaptures().map((capture) => capture.id),
-      [second.id, first.id],
-    );
-  } finally {
-    store.close();
-  }
-});
-
-test("today includes overdue scheduled tasks but not unscheduled tasks", () => {
-  const store = new OpsStore(":memory:");
-  try {
-    const overdue = store.createTask({
-      title: "overdue",
-      scheduledOn: "2026-07-20",
-      dueOn: null,
+    const validation = new GitWorkspace().validate(vault);
+    const proposal = store.createWorkspaceConfigProposal({
+      rootPath: vault,
+      codexGranted: true,
+      grokGranted: true,
+      validation,
     });
-    const today = store.createTask({
-      title: "today",
-      scheduledOn: "2026-07-22",
-      dueOn: null,
-    });
-    store.createTask({ title: "future", scheduledOn: "2026-07-23", dueOn: null });
-    store.createTask({ title: "unscheduled", scheduledOn: null, dueOn: null });
+    const configuration = store.confirmWorkspaceConfigProposal(proposal.id);
+    assert.equal(configuration.version, 1);
+    assert.equal(configuration.rootPath, validation.rootPath);
 
-    assert.deepEqual(
-      store.listTodayTasks("2026-07-22").map((task) => task.id),
-      [overdue.id, today.id],
-    );
-  } finally {
-    store.close();
-  }
-});
-
-test("completing and deferring a task changes canonical state", () => {
-  const store = new OpsStore(":memory:");
-  try {
-    const task = store.createTask({ title: "check", scheduledOn: null, dueOn: null });
-    const deferred = store.updateTask(task.id, { scheduledOn: "2026-07-24" });
-    assert.equal(deferred?.scheduledOn, "2026-07-24");
-
-    const completed = store.updateTask(task.id, { completed: true });
-    assert.ok(completed?.completedAt);
-    assert.equal(store.listOpenTasks().length, 0);
-  } finally {
-    store.close();
-  }
-});
-
-test("AI conversations persist ordered messages and idempotent jobs", () => {
-  const store = new OpsStore(":memory:");
-  try {
     const conversation = store.createAiConversation({
       provider: "codex",
-      model: "gpt-5.6",
+      model: "default",
       reasoningEffort: "high",
     });
-    const turn = store.createAiTurn({
+    assert.equal(store.createAiConversation({
+      provider: "grok",
+      model: "default",
+      reasoningEffort: "default",
+    }).id, conversation.id);
+
+    const requestId = "edff3c61-d351-43f4-9015-7c586bc0fb98";
+    const first = store.createAiTurn({
       conversationId: conversation.id,
-      clientRequestId: "11111111-1111-4111-8111-111111111111",
-      message: "첫 질문입니다",
-      model: "gpt-5.6",
+      clientRequestId: requestId,
+      message: "오늘 일정은?",
+      model: "default",
       reasoningEffort: "high",
     });
     const duplicate = store.createAiTurn({
       conversationId: conversation.id,
-      clientRequestId: "11111111-1111-4111-8111-111111111111",
-      message: "무시되는 중복 요청",
-      model: "gpt-5.6",
+      clientRequestId: requestId,
+      message: "ignored",
+      model: "default",
       reasoningEffort: "high",
     });
-
     assert.equal(duplicate.duplicate, true);
-    assert.equal(duplicate.job.id, turn.job.id);
-    const otherConversation = store.createAiConversation({
-      provider: "codex",
-      model: "default",
-      reasoningEffort: "default",
-    });
-    assert.throws(() => store.createAiTurn({
-      conversationId: otherConversation.id,
-      clientRequestId: "11111111-1111-4111-8111-111111111111",
-      message: "다른 대화의 중복 키",
-      model: "default",
-      reasoningEffort: "default",
-    }), /another conversation/);
-    assert.deepEqual(
-      store.listAiMessages(conversation.id).map((message) => [message.role, message.content]),
-      [["user", "첫 질문입니다"], ["assistant", ""]],
-    );
-    assert.equal(store.getAiConversation(conversation.id)?.title, "첫 질문입니다");
-  } finally {
-    store.close();
-  }
-});
+    assert.equal(duplicate.job.id, first.job.id);
+    store.transitionJob(first.job.id, "succeeded", { content: "답변", error: null });
 
-test("AI assistants are limited to two active slots and reset without deleting history", () => {
-  const store = new OpsStore(":memory:");
-  try {
-    const primary = store.createAiConversation({
-      assistantSlot: 1,
-      provider: "codex",
-      model: "default",
-      reasoningEffort: "default",
-    });
-    const secondary = store.createAiConversation({
-      assistantSlot: 2,
+    const switched = store.switchConversationProvider(conversation.id, {
       provider: "grok",
       model: "default",
-      reasoningEffort: "default",
-    });
-
-    assert.deepEqual(store.listAiConversations().map((item) => item.id), [primary.id, secondary.id]);
-    assert.throws(() => store.createAiConversation({
-      provider: "codex",
-      model: "default",
-      reasoningEffort: "default",
-    }), /limit reached/);
-
-    const replacement = store.resetAiConversation(primary.id, {
-      provider: "grok",
-      model: "grok-4.5",
       reasoningEffort: "high",
     });
-    assert.equal(replacement.assistantSlot, 1);
-    assert.notEqual(replacement.id, primary.id);
-    assert.equal(replacement.provider, "grok");
-    assert.equal(replacement.defaultModel, "grok-4.5");
-    assert.equal(replacement.defaultReasoningEffort, "high");
-    assert.equal(replacement.providerThreadId, null);
-    assert.equal(store.getActiveAiConversation(primary.id), null);
-    assert.equal(store.getAiConversation(primary.id)?.archivedAt === null, false);
-    assert.deepEqual(store.listArchivedAiConversations().map((item) => item.id), [primary.id]);
+    assert.equal(switched.providerSegment, 2);
+    assert.equal(switched.provider, "grok");
   } finally {
     store.close();
+    rmSync(temporary, { recursive: true, force: true });
   }
 });
 
-test("AI history can be cleared without deleting other application data", () => {
-  const store = new OpsStore(":memory:");
-  try {
-    store.createCapture("keep capture");
-    store.createTask({ title: "keep task", scheduledOn: null, dueOn: null });
-    store.createAiConversation({
-      provider: "codex",
-      model: "default",
-      reasoningEffort: "default",
-    });
-
-    assert.deepEqual(store.clearAiHistory(), {
-      conversations: 1,
-      messages: 0,
-      messageSources: 0,
-      jobs: 0,
-      retrievalRuns: 0,
-      retrievalCandidates: 0,
-    });
-    assert.equal(store.listAiConversations().length, 0);
-    assert.equal(store.listCaptures().length, 1);
-    assert.equal(store.listOpenTasks().length, 1);
-  } finally {
-    store.close();
-  }
-});
-
-test("all application data can be reset atomically when no AI job is active", () => {
-  const store = new OpsStore(":memory:");
-  try {
-    store.createCapture("delete capture");
-    store.createTask({ title: "delete task", scheduledOn: null, dueOn: null });
-    store.createAiConversation({
-      provider: "grok",
-      model: "default",
-      reasoningEffort: "default",
-    });
-    store.updateAssistantProfile({
-      name: "temporary assistant",
-      ownerAddress: "owner",
-      roleDescription: "temporary role",
-      communicationStyle: "temporary style",
-      workingPrinciples: "temporary principle",
-    });
-
-    assert.deepEqual(store.resetAllData(), {
-      captures: 1,
-      tasks: 1,
-      assistantProfileVersions: 2,
-      intakeProposals: 0,
-      assistantMemos: 0,
-      assistantMemoVersions: 0,
-      projectionStatuses: 0,
-      projects: 0,
-      projectAliases: 0,
-      projectSnapshots: 0,
-      actionSnapshots: 0,
-      decisionSnapshots: 0,
-      dependencySnapshots: 0,
-      riskSnapshots: 0,
-      meetingSnapshots: 0,
-      judgmentSnapshots: 0,
-      conversations: 1,
-      messages: 0,
-      messageSources: 0,
-      jobs: 0,
-      retrievalRuns: 0,
-      retrievalCandidates: 0,
-    });
-    assert.equal(store.listCaptures().length, 0);
-    assert.equal(store.listOpenTasks().length, 0);
-    assert.equal(store.listAiConversations().length, 0);
-    assert.equal(store.getAssistantProfile().version, 1);
-    assert.equal(store.getAssistantProfile().name, "주 비서");
-  } finally {
-    store.close();
-  }
-});
-
-test("assistant profile changes are versioned and survive chat-history deletion", () => {
-  const store = new OpsStore(":memory:");
+test("profile changes are versioned and workspace proposals fail closed", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "ops-store-"));
+  const store = new OpsStore(join(temporary, "runtime.db"));
   try {
     const initial = store.getAssistantProfile();
     const updated = store.updateAssistantProfile({
-      name: "지안",
-      ownerAddress: "대표님",
-      roleDescription: "개인 운영을 총괄한다.",
-      communicationStyle: "짧고 직접적으로 말한다.",
-      workingPrinciples: "허점을 발견하면 지적한다.",
+      name: "테스트 비서",
+      ownerAddress: "사용자",
+      roleDescription: "WorkOS 비서",
+      communicationStyle: "간결하게",
+      workingPrinciples: "안전하게",
+      timezone: "Asia/Seoul",
     });
-    store.createAiConversation({
-      provider: "grok",
-      model: "default",
-      reasoningEffort: "default",
-    });
-    store.clearAiHistory();
-
     assert.equal(updated.version, initial.version + 1);
-    assert.equal(store.getAssistantProfile().name, "지안");
-    assert.equal(store.debugDataset("assistant_profile_versions").length, 2);
+
+    const invalid = store.createWorkspaceConfigProposal({
+      rootPath: join(temporary, "missing"),
+      codexGranted: true,
+      grokGranted: false,
+      validation: new GitWorkspace().validate(join(temporary, "missing")),
+    });
+    assert.throws(() => store.confirmWorkspaceConfigProposal(invalid.id), /invalid/u);
   } finally {
     store.close();
-  }
-});
-
-test("data deletion is rejected while an AI job is queued", () => {
-  const store = new OpsStore(":memory:");
-  try {
-    const conversation = store.createAiConversation({
-      provider: "codex",
-      model: "default",
-      reasoningEffort: "default",
-    });
-    store.createAiTurn({
-      conversationId: conversation.id,
-      clientRequestId: "44444444-4444-4444-8444-444444444444",
-      message: "queued request",
-      model: "default",
-      reasoningEffort: "default",
-    });
-
-    assert.equal(store.hasActiveAiJobs(), true);
-    assert.throws(() => store.clearAiHistory(), /active AI jobs/);
-    assert.throws(() => store.resetAllData(), /active AI jobs/);
-    assert.equal(store.listAiConversations().length, 1);
-  } finally {
-    store.close();
-  }
-});
-
-test("AI jobs follow durable terminal transitions", () => {
-  const store = new OpsStore(":memory:");
-  try {
-    const conversation = store.createAiConversation({
-      provider: "grok",
-      model: "default",
-      reasoningEffort: "default",
-    });
-    const turn = store.createAiTurn({
-      conversationId: conversation.id,
-      clientRequestId: "22222222-2222-4222-8222-222222222222",
-      message: "계속 이야기해 주세요",
-      model: "default",
-      reasoningEffort: "default",
-    });
-
-    assert.equal(store.startAiJob(turn.job.id)?.status, "running");
-    store.updateAiJobPartial(turn.job.id, "부분 응답");
-    store.completeAiJob(turn.job.id, {
-      content: "완성 응답",
-      inputTokens: 5,
-      cachedInputTokens: 1,
-      outputTokens: 3,
-      reasoningTokens: 2,
-      durationMs: 25,
-      providerThreadId: "provider-thread",
-    });
-
-    assert.equal(store.getAiJob(turn.job.id)?.status, "succeeded");
-    assert.deepEqual(store.listAiMessages(conversation.id).at(-1), {
-      ...turn.assistantMessage,
-      content: "완성 응답",
-      status: "completed",
-      inputTokens: 5,
-      cachedInputTokens: 1,
-      outputTokens: 3,
-      reasoningTokens: 2,
-      durationMs: 25,
-      updatedAt: store.listAiMessages(conversation.id).at(-1)?.updatedAt,
-    });
-    assert.equal(store.getAiConversation(conversation.id)?.providerThreadId, "provider-thread");
-    assert.equal(store.finishAiJob(turn.job.id, "failed", "late failure"), null);
-  } finally {
-    store.close();
-  }
-});
-
-test("running AI jobs are marked interrupted after restart recovery", () => {
-  const store = new OpsStore(":memory:");
-  try {
-    const conversation = store.createAiConversation({
-      provider: "codex",
-      model: "default",
-      reasoningEffort: "default",
-    });
-    const turn = store.createAiTurn({
-      conversationId: conversation.id,
-      clientRequestId: "33333333-3333-4333-8333-333333333333",
-      message: "중단될 요청",
-      model: "default",
-      reasoningEffort: "default",
-    });
-    store.startAiJob(turn.job.id);
-
-    assert.equal(store.interruptRunningAiJobs(), 1);
-    assert.equal(store.getAiJob(turn.job.id)?.status, "interrupted");
-    assert.equal(store.getAiMessage(turn.assistantMessage.id)?.status, "failed");
-  } finally {
-    store.close();
+    rmSync(temporary, { recursive: true, force: true });
   }
 });

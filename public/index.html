@@ -2,503 +2,128 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#183d32" />
-    <title>Personal Ops</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#142019" />
+    <title>Personal Ops · WorkOS</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <svg class="icon-sprite" aria-hidden="true">
-      <symbol id="icon-spark" viewBox="0 0 24 24"><path d="M12 2l1.7 5.2L19 9l-5.3 1.8L12 16l-1.7-5.2L5 9l5.3-1.8L12 2Z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z"/></symbol>
-      <symbol id="icon-home" viewBox="0 0 24 24"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9Z"/><path d="M9 20v-6h6v6"/></symbol>
-      <symbol id="icon-overview" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
-      <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
-      <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/></symbol>
-      <symbol id="icon-book" viewBox="0 0 24 24"><path d="M4 5a3 3 0 0 1 3-3h5v18H7a3 3 0 0 0-3 2V5Z"/><path d="M20 5a3 3 0 0 0-3-3h-5v18h5a3 3 0 0 1 3 2V5Z"/></symbol>
-      <symbol id="icon-inbox" viewBox="0 0 24 24"><path d="M4 4h16l2 12v4H2v-4L4 4Z"/><path d="M2 16h6l2 2h4l2-2h6"/></symbol>
-      <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7"/></symbol>
-      <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
-      <symbol id="icon-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
-      <symbol id="icon-send" viewBox="0 0 24 24"><path d="m4 4 17 8-17 8 3-8-3-8Z"/><path d="M7 12h14"/></symbol>
-      <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-      <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
-      <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
-      <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
-      <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
-      <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
-    </svg>
-
-    <div class="app-shell" data-ui-version="assistant-shell-v1">
-      <aside class="sidebar" aria-label="주 탐색">
-        <a class="brand" href="/" aria-label="Personal Ops 홈">
-          <span class="brand-mark"><svg><use href="#icon-spark" /></svg></span>
-          <span class="brand-copy"><strong>Personal Ops</strong><small>개인 운영실</small></span>
-        </a>
-
-        <nav class="side-nav" aria-label="서비스 메뉴">
-          <button class="nav-item active" type="button" data-view="비서" aria-current="page">
-            <svg><use href="#icon-home" /></svg><span>비서</span>
-          </button>
-          <button class="nav-item" type="button" data-view="프로젝트 개요">
-            <svg><use href="#icon-overview" /></svg><span>프로젝트 개요</span>
-          </button>
-          <button class="nav-item" type="button" data-view="오늘">
-            <svg><use href="#icon-calendar" /></svg><span>오늘</span><em>3</em>
-          </button>
-          <button class="nav-item" type="button" data-view="프로젝트">
-            <svg><use href="#icon-folder" /></svg><span>프로젝트</span>
-          </button>
-          <button class="nav-item" type="button" data-view="지식">
-            <svg><use href="#icon-book" /></svg><span>지식</span>
-          </button>
-          <button class="nav-item" type="button" data-view="받은함">
-            <svg><use href="#icon-inbox" /></svg><span>받은함</span><em id="inbox-count">0</em>
-          </button>
-          <button class="nav-item" type="button" data-view="디버그">
-            <svg><use href="#icon-database" /></svg><span>디버그</span>
-          </button>
+    <div class="app-shell">
+      <aside class="rail">
+        <div class="brand">
+          <span class="brand-mark">PO</span>
+          <div><strong>Personal Ops</strong><small>WORKOS NATIVE</small></div>
+        </div>
+        <nav>
+          <button class="nav-item active" type="button"><span>⌂</span><b>비서</b></button>
         </nav>
-
-        <div class="sidebar-footer">
-          <div class="system-state"><span></span><div><strong>운영 준비됨</strong><small>Tailscale 전용</small></div></div>
-          <button id="settings-button" class="avatar-button" type="button"><span>나</span><small>설정</small></button>
+        <div class="rail-bottom">
+          <div id="rail-workspace" class="workspace-pill"><i></i><span>설정 확인 중</span></div>
+          <button id="settings-open" class="nav-item" type="button"><span>⚙</span><b>설정</b></button>
         </div>
       </aside>
 
-      <main class="workspace">
+      <main class="main">
         <header class="topbar">
-          <div class="topbar-copy">
-            <span class="mobile-brand"><svg><use href="#icon-spark" /></svg></span>
-            <div>
-              <p id="view-kicker">주 비서</p>
-              <h1 id="view-title">운영 브리핑</h1>
-            </div>
+          <div class="topbar-title">
+            <p>CHIEF ASSISTANT</p>
+            <h1 id="assistant-title">WorkOS 비서</h1>
           </div>
           <div class="topbar-actions">
-            <time id="current-date"></time>
-            <button id="search-button" class="icon-button" type="button" aria-label="검색">
-              <svg><use href="#icon-search" /></svg>
-            </button>
-            <button class="icon-button context-toggle" type="button" aria-label="운영 상황 열기" aria-controls="context-panel" aria-expanded="false">
-              <svg><use href="#icon-panel" /></svg><span class="attention-dot"></span>
-            </button>
+            <span id="git-badge" class="status-badge">Workspace 확인 중</span>
+            <button id="mobile-context" class="icon-button" type="button" aria-label="작업공간 상태">◎</button>
+            <button id="mobile-settings" class="avatar-button" type="button" aria-label="설정 열기">설정</button>
           </div>
         </header>
 
-        <section id="assistant-view" class="conversation" aria-label="주 비서 대화">
-          <div class="conversation-inner">
-            <div class="conversation-intro">
-              <div>
-                <span class="preview-label">PRIVATE WORKSPACE</span>
-                <h2>무엇을 함께 정리할까요?</h2>
-                <p>프로젝트 이름과 알고 있는 사실을 말씀하면 근거를 보존하고 확인 가능한 브리프로 연결합니다.</p>
-              </div>
-              <button id="new-context" class="quiet-button" type="button">새 대화</button>
-            </div>
-
-            <div id="ai-transcript" class="transcript" aria-live="polite">
-              <article class="turn assistant-turn preview-turn">
-                <div class="assistant-avatar"><svg><use href="#icon-spark" /></svg></div>
-                <div class="turn-content">
-                  <div class="turn-meta"><strong id="preview-assistant-name">주 비서</strong><span>시작 안내</span></div>
-                  <p class="lead-message">일반 대화는 그대로 답하고, 보존할 내용은 메모와 프로젝트 projection으로 정리해 저장 여부를 먼저 확인합니다.</p>
-                </div>
-              </article>
-              <div id="dynamic-transcript" class="dynamic-transcript"></div>
-            </div>
-
-            <div class="quick-prompts" aria-label="빠른 질문">
-              <button type="button" data-prompt="오늘 제가 판단해야 할 것만 알려주세요">오늘 판단할 것</button>
-              <button type="button" data-prompt="진행 중인 프로젝트의 위험을 요약해주세요">프로젝트 위험</button>
-              <button type="button" data-prompt="최근 기록에서 다시 볼 지식을 찾아주세요">관련 지식 찾기</button>
-            </div>
-          </div>
-        </section>
-
-        <section id="project-overview" class="project-overview" aria-labelledby="overview-heading" hidden>
-          <div class="overview-inner">
-            <header class="overview-hero">
-              <div>
-                <span class="preview-label">PRODUCT CONSTITUTION</span>
-                <p class="overview-kicker">PERSONAL OPS SERVER</p>
-                <h2 id="overview-heading">개인 운영을 맡는<br />AI 전문 비서 시스템</h2>
-                <p class="overview-summary">사용자는 자연어로 목적과 자료를 전달하고, 한 명의 주 비서가 맥락을 복원해 프로젝트·일정·지식·결정·후속 조치를 하나의 운영 세계에서 관리합니다.</p>
-              </div>
-              <div class="overview-principles" aria-label="핵심 제품 원칙">
-                <span>한 명의 소유자</span><span>AI 운영 중심</span><span>Local-first</span><span>근거 기반</span>
-              </div>
-            </header>
-
-            <nav class="overview-nav" aria-label="개요 목차">
-              <a href="#overview-purpose">추구하는 것</a>
-              <a href="#overview-workflow">사용 흐름</a>
-              <a href="#overview-processing">처리 과정</a>
-              <a href="#overview-roles">비서의 개념</a>
-              <a href="#overview-capabilities">핵심 기능</a>
-              <a href="#overview-ai">AI의 책임</a>
-              <a href="#overview-roadmap">개발 단계</a>
-            </nav>
-
-            <section id="overview-purpose" class="overview-section">
-              <div class="overview-section-heading"><span>01</span><div><p>WHY</p><h3>무엇을 해결하려는가</h3></div></div>
-              <div class="overview-two-column">
-                <article class="overview-card problem-card">
-                  <p class="card-label">현재의 문제</p>
-                  <h4>정보보다 조율 비용이 더 큽니다.</h4>
-                  <p>생각, 회의, 문서, 일정, 약속과 지식이 서로 다른 도구에 흩어지면 사용자가 직접 분류하고 맥락을 복구하며 누락된 후속 조치를 기억해야 합니다.</p>
-                  <ul class="plain-list"><li>어디에 저장할지 매번 판단</li><li>행동 전에 맥락을 다시 조립</li><li>중복·충돌 상태를 수동으로 확인</li><li>결정과 약속을 기억에 의존</li></ul>
-                </article>
-                <article class="overview-card promise-card">
-                  <p class="card-label">제품의 약속</p>
-                  <h4>사용자는 말하고, 시스템은 운영합니다.</h4>
-                  <p>원자료를 자연어로 전달하면 비서가 관련 맥락을 찾고, 필요한 판단만 요청하며, 승인된 일을 안전하게 처리하고 근거와 결과를 남깁니다.</p>
-                  <blockquote>“어디에 기록할지”가 아니라<br />“무엇을 원하는지”만 말합니다.</blockquote>
-                </article>
-              </div>
-            </section>
-
-            <section id="overview-workflow" class="overview-section">
-              <div class="overview-section-heading"><span>02</span><div><p>WORKFLOW</p><h3>사용자는 짧게 말하고, 비서가 정리합니다</h3></div></div>
-              <div class="workflow-strip">
-                <article><strong>1</strong><div><h4>자연어로 말하기</h4><p>정갈한 문서나 입력 양식 없이 실제 상황을 짧고 불완전하게 전달합니다.</p></div></article>
-                <article><strong>2</strong><div><h4>비서가 한 번 정리</h4><p>원문을 보존하고 행동·결정·지식·선호·열린 질문과 불확실성을 하나의 메모로 묶습니다.</p></div></article>
-                <article><strong>3</strong><div><h4>대화로 확인</h4><p>“저장해”, “월요일로 고쳐줘”, “저장하지 마”처럼 자연어로 승인·교정·거절합니다.</p></div></article>
-                <article><strong>4</strong><div><h4>받은함에서 검토</h4><p>승인된 원문과 비서 메모는 대화와 독립되어 남고 변경 이력을 확인할 수 있습니다.</p></div></article>
-              </div>
-              <div class="workflow-example"><small>예시</small><p>“알파 건은 금요일쯤 민수에게 배포 일정 한번 물어봐야 해.”</p><strong>→ 알파 프로젝트의 금요일 후속 행동으로 정리하고 저장 여부를 확인합니다.</strong></div>
-            </section>
-
-            <section id="overview-processing" class="overview-section">
-              <div class="overview-section-heading"><span>03</span><div><p>PROCESS MAP</p><h3>한 번의 대화가 데이터가 되는 과정</h3></div></div>
-              <div class="processing-flow" aria-label="대화형 수집 처리 흐름">
-                <article><span>01</span><strong>사용자 발언</strong><p>원문을 AI 메시지와 작업으로 먼저 보존</p><code>ai_messages · ai_jobs</code></article>
-                <i>→</i>
-                <article><span>02</span><strong>검색·맥락 구성</strong><p>정확한 프로젝트 별칭을 결정론적으로 해석하고 snapshot 전체를 SQL로 조회</p><code>retrieval_runs · snapshots</code></article>
-                <i>→</i>
-                <article><span>03</span><strong>AI 판단</strong><p>저장 가치·의미 종류·모호함·확인 의도를 판단</p><code>Codex / Grok CLI</code></article>
-                <i>→</i>
-                <article><span>04</span><strong>스키마·근거 검증</strong><p>고정 JSON 계약과 검색 결과 ID로 응답·인용을 검사</p><code>AssistantTurnEnvelope</code></article>
-                <i>→</i>
-                <article><span>05</span><strong>대화 확인</strong><p>저장해·고쳐줘·저장하지 마를 대기 제안에 연결</p><code>intake_proposals</code></article>
-                <i>→</i>
-                <article><span>06</span><strong>원자적 저장</strong><p>승인된 원문과 메모 버전을 한 트랜잭션으로 반영</p><code>assistant_memos · versions</code></article>
-              </div>
-
-              <div class="processing-detail-grid">
-                <article class="judgment-panel">
-                  <p class="card-label">AI가 판단하는 것</p>
-                  <h4>무엇을 메모 후보로 만들 것인가</h4>
-                  <dl>
-                    <div><dt>반드시 제안</dt><dd>기억·저장 요청, 구체적 행동, 결정, 지속 선호, 재사용 지식, 열린 질문</dd></div>
-                    <div><dt>보통 제안하지 않음</dt><dd>인사, 잡담, 답변만 필요하고 지속 가치가 없는 일반 질문</dd></div>
-                    <div><dt>불확실성 유지</dt><dd>“아마”, “금요일쯤” 같은 표현은 확정 사실로 바꾸지 않고 별도 표시</dd></div>
-                    <div><dt>권한 판단</dt><dd>제안은 저장이 아니며 사용자의 후속 자연어 확인 전에는 기준 데이터가 되지 않음</dd></div>
-                  </dl>
-                </article>
-                <article class="source-panel">
-                  <p class="card-label">AI에게 제공되는 근거</p>
-                  <h4>파일을 탐색하지 않고, 앱이 만든 맥락만 받습니다</h4>
-                  <ul>
-                    <li><code>ai_messages</code><span>현재 대화의 최근 메시지</span></li>
-                    <li><code>intake_proposals</code><span>현재 대화에서 확인을 기다리는 제안</span></li>
-                    <li><code>project_*_snapshots</code><span>확정 프로젝트의 현재 구조화 사실 전체 집합</span></li>
-                    <li><code>assistant_memo_search</code><span>대상 미확정 질문과 원문 설명을 위한 보조 FTS 후보</span></li>
-                    <li><code>ai_message_sources</code><span>검증을 통과해 답변에 실제 사용된 메모 근거</span></li>
-                    <li><code>assistant_profiles</code><span>사용자가 확정한 비서 이름·역할·대화 방식·업무 원칙</span></li>
-                    <li><code>src/ai/streaming-service.ts</code><span>저장 가치와 확인 방식에 관한 고정 지침</span></li>
-                    <li><code>src/domain/intake.ts</code><span>허용되는 출력 종류·길이·구조의 JSON Schema</span></li>
-                  </ul>
-                </article>
-              </div>
-
-              <div class="processing-boundary">
-                <strong>중요한 경계</strong>
-                <p>웹에서 시작된 AI는 운영체제가 관리하는 저장소 외부의 격리 작업공간에서 실행되며 웹 검색·MCP·하위 Agent·애플리케이션 도메인 도구를 제공받지 않습니다. 개발 저장소의 <code>AGENTS.md</code>, 개인 폴더, WorkOS, SQLite를 직접 읽거나 쓰지 않습니다. <code>src/infra/store.ts</code>가 검증된 결과만 SQLite 트랜잭션으로 적용하고, <code>src/app.ts</code>가 브라우저에 안전한 API만 노출합니다.</p>
-              </div>
-            </section>
-
-            <section id="overview-roles" class="overview-section">
-              <div class="overview-section-heading"><span>04</span><div><p>RELATIONSHIP</p><h3>전문 비서의 개념</h3></div></div>
-              <article class="chief-role">
-                <div class="role-emblem"><svg><use href="#icon-spark" /></svg></div>
-                <div><p class="card-label">단일 대화 창구</p><h4>주 비서는 사용자를 대면하는 하나의 관계입니다.</h4><p>의도를 해석하고 주의를 보호하며, 필요한 맥락을 모으고, 전문 역할의 결과를 조율해 하나의 운영 답변으로 제시합니다. 대화는 명령과 검토의 표면이지 데이터베이스가 아닙니다.</p></div>
-              </article>
-              <div class="role-grid">
-                <article class="role-card"><span class="role-number">A</span><div><small>OWNER</small><h4>사용자</h4><p>목적, 가치, 원자료, 교정과 중요한 결정의 최종 권한을 제공합니다.</p></div></article>
-                <article class="role-card"><span class="role-number">P</span><div><small>PROJECT MANAGER</small><h4>프로젝트 관리자</h4><p>목표, 현재 상태, 행동, 회의, 결정, 의존성, 위험과 후속 조치를 추론합니다.</p></div></article>
-                <article class="role-card"><span class="role-number">K</span><div><small>KNOWLEDGE RESEARCHER</small><h4>지식 탐구자</h4><p>자료를 검색·비교하고 근거와 추론을 분리해 재사용 가능한 지식을 만듭니다.</p></div></article>
-              </div>
-              <p class="section-note">전문 역할은 별도 채팅방이나 독립 데이터베이스가 아닙니다. 실제로 다른 전문성·도구·맥락·평가가 필요할 때만 주 비서 뒤에 추가됩니다.</p>
-            </section>
-
-            <section id="overview-capabilities" class="overview-section">
-              <div class="overview-section-heading"><span>05</span><div><p>PRODUCT</p><h3>시스템이 제공할 기능</h3></div></div>
-              <div class="capability-grid">
-                <article><svg><use href="#icon-home" /></svg><div><h4>비서</h4><p>자연어 지시, 확인 질문, 브리핑, 제안, 실행 결과 검토</p></div></article>
-                <article><svg><use href="#icon-calendar" /></svg><div><h4>오늘</h4><p>지금 필요한 소수의 집중 항목, 판단, 일정과 후속 조치</p></div></article>
-                <article><svg><use href="#icon-folder" /></svg><div><h4>프로젝트</h4><p>목표, 상태, 행동, 회의, 결정, 의존성, 위험과 관계자</p></div></article>
-                <article><svg><use href="#icon-book" /></svg><div><h4>지식</h4><p>출처가 있는 주장, 조사, 방법, 모순과 열린 질문</p></div></article>
-                <article><svg><use href="#icon-inbox" /></svg><div><h4>받은함·근거</h4><p>원문, 문서, 링크, 회의 자료, 출처와 처리 상태 보존</p></div></article>
-                <article><svg><use href="#icon-check" /></svg><div><h4>검토·감사</h4><p>제안, 승인, 영수증, 교정, 실행 취소와 막힌 작업</p></div></article>
-              </div>
-            </section>
-
-            <section id="overview-ai" class="overview-section">
-              <div class="overview-section-heading"><span>06</span><div><p>AI CONTRACT</p><h3>AI가 지원해야 하는 것</h3></div></div>
-              <div class="ai-contract-grid">
-                <article class="ai-do"><div class="contract-title"><span>DO</span><h4>AI의 책임</h4></div><ul><li>의도·주제·긴급성·모호함 파악</li><li>목표에 필요한 최소 맥락 검색</li><li>프로젝트·일정·사람·결정·지식 연결</li><li>필요한 전문 역할에 제한된 위임</li><li>근거·상태·추론·제안·미확인 사항 분리</li><li>검증 가능한 구조화 작업 의도 반환</li><li>누락과 실패를 숨기지 않고 보고</li></ul></article>
-                <article class="ai-dont"><div class="contract-title"><span>DON'T</span><h4>AI가 소유하지 않는 것</h4></div><ul><li>SQLite와 기준 파일 직접 쓰기</li><li>일반 셸·무제한 파일시스템 접근</li><li>CLI 인증정보와 운영체제 비밀</li><li>모델 자신이 권한을 확대하는 판단</li><li>조용한 삭제·마이그레이션·외부 전송</li><li>근거 없는 사실·약속·완료 상태 발명</li><li>에이전트별 독립된 운영 데이터</li></ul></article>
-              </div>
-              <div class="authority-strip"><article><strong>Observe</strong><span>검색·조사·비교·진단</span></article><svg><use href="#icon-chevron" /></svg><article><strong>Operate</strong><span>요청된 저위험 작업 적용</span></article><svg><use href="#icon-chevron" /></svg><article><strong>Govern</strong><span>삭제·외부 전송 등 별도 승인</span></article></div>
-            </section>
-
-            <section class="overview-section">
-              <div class="overview-section-heading"><span>07</span><div><p>TRUSTED WORLD</p><h3>하나의 공유 운영 세계</h3></div></div>
-              <div class="data-layers">
-                <article><span>01</span><div><h4>원자료와 근거</h4><p>사용자의 원문, 파일, 회의 자료, URL, 시각과 출처를 변형 없이 보존합니다.</p></div></article>
-                <article><span>02</span><div><h4>운영 상태</h4><p>프로젝트, 약속, 행동, 일정, 사람, 의존성, 위험과 결정의 현재 상태입니다.</p></div></article>
-                <article><span>03</span><div><h4>지식</h4><p>출처가 있는 주장, 종합, 방법, 모순과 열린 질문을 재사용합니다.</p></div></article>
-                <article><span>04</span><div><h4>비서 기억</h4><p>제한된 선호와 작업 관례이며 기준 상태를 대신하지 않습니다.</p></div></article>
-                <article><span>05</span><div><h4>감사 기록</h4><p>작업, 위임, 제안, 승인, 영수증, 교정과 취소 정보를 남깁니다.</p></div></article>
-              </div>
-            </section>
-
-            <section class="overview-section boundary-section">
-              <div class="overview-section-heading"><span>08</span><div><p>BOUNDARIES</p><h3>운영·보안 원칙</h3></div></div>
-              <div class="boundary-grid">
-                <article><strong>한 대의 기준 호스트</strong><p>집 PC가 기준 저장소이며 서비스는 localhost에만 바인딩됩니다.</p></article>
-                <article><strong>Tailnet 전용 접근</strong><p>PC·갤럭시 탭·스마트폰은 Tailscale Serve로만 연결합니다.</p></article>
-                <article><strong>공식 CLI 전용 AI</strong><p>구독 인증된 Codex·Grok CLI만 사용하며 모델 API 키는 사용하지 않습니다.</p></article>
-                <article><strong>WorkOS 독립성</strong><p>과거 WorkOS는 선택적 참고·가져오기 원천이며 제품 의존성이 아닙니다.</p></article>
-              </div>
-            </section>
-
-            <section id="overview-roadmap" class="overview-section roadmap-section">
-              <div class="overview-section-heading"><span>09</span><div><p>ROADMAP</p><h3>현재와 다음 개발 단계</h3></div></div>
-              <ol class="roadmap-list">
-                <li class="complete"><span><svg><use href="#icon-check" /></svg></span><div><small>확정</small><h4>반응형 비서 화면 구조</h4><p>하나의 주 비서와 PC·태블릿·스마트폰 공통 정보 구조</p></div></li>
-                <li class="complete"><span><svg><use href="#icon-check" /></svg></span><div><small>확정</small><h4>대화형 수집 파이프라인</h4><p>불완전한 자연어를 비서 메모로 제안하고 대화로 확인</p></div></li>
-                <li class="complete"><span><svg><use href="#icon-check" /></svg></span><div><small>완료</small><h4>근거 기반 비서 응답</h4><p>저장된 원문과 메모를 검색해 출처와 함께 답변</p></div></li>
-                <li class="complete"><span><svg><use href="#icon-check" /></svg></span><div><small>완료</small><h4>프로젝트 관리자 읽기 워크플로</h4><p>상태·행동·결정·위험을 버전 고정 근거와 coverage로 브리핑</p></div></li>
-                <li class="next"><span>5</span><div><small>다음</small><h4>일정 읽기 기반</h4><p>상대 날짜, 범위, 반복과 예외를 event projection으로 연결</p></div></li>
-                <li><span>6</span><div><small>이후</small><h4>지식·능동 지원·선택적 가져오기</h4><p>지속 지식, 예약된 후속 조치와 독립적인 과거 자료 흡수</p></div></li>
-              </ol>
-              <div class="next-slice"><p>NEXT VERTICAL SLICE</p><strong>일정 event projection → 시간대·상대 날짜 해석 → 근거가 있는 일정 읽기</strong></div>
-            </section>
-
-            <footer class="overview-footer"><span>Personal Ops Server</span><p>제품 개요 · 현재 기준선</p></footer>
-          </div>
-        </section>
-
-        <section id="projects-view" class="projects-view" aria-labelledby="projects-heading" hidden>
-          <div class="projects-shell">
-            <aside class="projects-directory" aria-label="프로젝트 목록">
-              <header class="projects-header">
-                <div><p>OPERATIONAL PROJECTS</p><h2 id="projects-heading">프로젝트</h2><span>대화에서 확인된 프로젝트를 읽기 전용으로 살펴봅니다.</span></div>
-                <button id="projects-refresh" class="quiet-button" type="button">새로고침</button>
-              </header>
-              <div id="projects-status" class="projects-status" aria-live="polite">프로젝트를 불러오는 중…</div>
-              <div id="projects-list" class="projects-list"></div>
-            </aside>
-            <article id="project-detail" class="project-detail" aria-live="polite">
-              <div id="project-detail-empty" class="project-empty">
-                <span class="project-empty-mark"><svg><use href="#icon-folder" /></svg></span>
-                <h3>아직 선택한 프로젝트가 없습니다.</h3>
-                <p>비서 대화에서 프로젝트의 결과, 현재 상태, 행동이나 위험을 말씀하고 정리 제안을 확인하면 이곳에 나타납니다.</p>
-                <button class="primary-button" type="button" data-project-chat>비서에게 프로젝트 전달</button>
-              </div>
-              <div id="project-detail-content" hidden>
-                <button id="project-back" class="project-back" type="button"><svg><use href="#icon-chevron" /></svg> 프로젝트 목록</button>
-                <header class="project-detail-header">
-                  <div><p>PROJECT BRIEF</p><h2 id="project-detail-name"></h2><span id="project-detail-aliases"></span></div>
-                  <button id="project-brief-request" class="primary-button" type="button">비서에게 브리핑 요청</button>
-                </header>
-                <div id="project-coverage" class="project-coverage"></div>
-                <p id="project-updated" class="project-updated"></p>
-                <div id="project-brief-sections" class="project-brief-sections"></div>
-                <section class="project-sources">
-                  <div class="project-section-heading"><p>SOURCES</p><h3>버전 고정 출처</h3></div>
-                  <div id="project-source-list" class="project-source-list"></div>
-                </section>
+        <section id="conversation" class="conversation" aria-live="polite">
+          <div id="conversation-inner" class="conversation-inner">
+            <article id="conversation-intro" class="intro-card">
+              <span class="intro-symbol">W</span>
+              <p>WORKOS-NATIVE ASSISTANT</p>
+              <h2>당신의 실제 WorkOS에서 함께 일합니다.</h2>
+              <p class="intro-copy">Codex와 Grok이 WorkOS의 AGENTS.md, PKM specification, skills를 직접 읽습니다. 질문은 읽기 전용으로 답하고, 변경은 사전계획과 위험도 검증을 거칩니다.</p>
+              <div class="intro-grid">
+                <div><small>READ</small><strong>프로젝트·일정·지식 복원</strong></div>
+                <div><small>OPERATE</small><strong>승인된 범위의 직접 수정</strong></div>
+                <div><small>RECEIPT</small><strong>Git commit과 Undo</strong></div>
               </div>
             </article>
+            <div id="messages" class="messages"></div>
           </div>
         </section>
 
-        <section id="inbox-view" class="inbox-view" aria-labelledby="inbox-heading" hidden>
-          <div class="inbox-inner">
-            <header class="inbox-header">
-              <div><p>ASSISTANT MEMORY</p><h2 id="inbox-heading">비서가 정리한 메모</h2><span>말씀하신 원문과 비서의 해석을 함께 확인할 수 있습니다.</span></div>
-              <button id="inbox-refresh" class="quiet-button" type="button">새로고침</button>
-            </header>
-            <div class="inbox-tabs" role="tablist" aria-label="받은함 상태">
-              <button class="active" type="button" role="tab" data-inbox-status="pending" aria-selected="true">확인 대기</button>
-              <button type="button" role="tab" data-inbox-status="confirmed" aria-selected="false">저장됨</button>
-              <button type="button" role="tab" data-inbox-status="rejected" aria-selected="false">거절됨</button>
+        <footer class="composer-wrap">
+          <form id="message-form" class="composer">
+            <textarea id="message-input" rows="1" maxlength="8000" placeholder="WorkOS에 대해 묻거나 작업을 요청하세요" required></textarea>
+            <div class="composer-controls">
+              <label>Provider<select id="provider-select"></select></label>
+              <label>Model<select id="model-select"></select></label>
+              <label>Reasoning<select id="reasoning-select"></select></label>
             </div>
-            <div id="inbox-status" class="inbox-status" aria-live="polite">메모를 불러오는 중…</div>
-            <div id="inbox-list" class="inbox-list"></div>
-          </div>
-        </section>
-
-        <section id="debug-view" class="debug-view" aria-labelledby="debug-heading" hidden>
-          <div class="debug-inner">
-            <header class="debug-header">
-              <div><p>SQLITE INSPECTOR</p><h2 id="debug-heading">애플리케이션 데이터</h2><span>허용된 테이블의 현재 상태를 읽기 전용으로 확인합니다.</span></div>
-              <button id="debug-refresh" class="quiet-button" type="button">새로고침</button>
-            </header>
-            <div id="debug-summary" class="debug-summary" aria-label="데이터 개요"></div>
-            <div class="debug-toolbar">
-              <label>테이블
-                <select id="debug-dataset"></select>
-              </label>
-              <label>표시 수
-                <select id="debug-limit"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option></select>
-              </label>
-              <span>인증정보·provider thread·내부 요청 키는 표시하지 않습니다.</span>
-            </div>
-            <div id="debug-status" class="debug-status" aria-live="polite">데이터를 불러오는 중…</div>
-            <div id="debug-table-wrap" class="debug-table-wrap" hidden>
-              <table class="debug-table">
-                <thead id="debug-table-head"></thead>
-                <tbody id="debug-table-body"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <footer id="assistant-composer" class="composer-wrap">
-          <form id="ai-form" class="composer">
-            <button id="attach-button" class="composer-icon" type="button" aria-label="자료 추가">
-              <svg><use href="#icon-plus" /></svg>
-            </button>
-            <label class="composer-input" for="ai-message">
-              <span class="visually-hidden">비서에게 메시지 보내기</span>
-              <textarea id="ai-message" name="message" rows="1" maxlength="8000" placeholder="무엇이든 말씀하세요…" required></textarea>
-              <span id="ai-status" class="composer-status" aria-live="polite">비서에게 자연어로 지시하세요</span>
-            </label>
-            <details class="model-menu">
-              <summary id="model-summary">AI 설정</summary>
-              <div class="model-popover">
-                <label>제공자<select id="ai-provider" name="provider"></select></label>
-                <label>모델<select id="ai-model" name="model"></select></label>
-                <label>추론<select id="ai-reasoning" name="reasoningEffort"></select></label>
-              </div>
-            </details>
-            <button id="ai-cancel" class="cancel-button" type="button" hidden>취소</button>
-            <button id="ai-submit" class="send-button" type="submit" aria-label="보내기">
-              <svg><use href="#icon-send" /></svg>
-            </button>
+            <button id="cancel-button" class="secondary-button" type="button" hidden>취소</button>
+            <button id="send-button" class="send-button" type="submit" aria-label="전송">↑</button>
           </form>
-          <p class="prototype-disclaimer">AI 응답과 저장 제안은 근거·coverage·확정 상태를 함께 확인하세요.</p>
+          <p id="composer-status">모든 요청은 읽기 전용 사전계획을 먼저 거칩니다.</p>
         </footer>
       </main>
 
-      <aside id="context-panel" class="context-panel" aria-label="운영 상황">
-        <header class="context-header">
-          <div><p>OVERVIEW</p><h2>운영 상황</h2></div>
-          <button class="icon-button context-close" type="button" aria-label="운영 상황 닫기"><svg><use href="#icon-close" /></svg></button>
+      <aside id="context-panel" class="context-panel">
+        <header>
+          <div><p>WORKSPACE</p><h2>운영 상태</h2></div>
+          <button id="context-close" class="icon-button" type="button">×</button>
         </header>
-
         <section class="context-section">
-          <div class="section-heading"><h3>프로젝트</h3><button id="context-projects-open" type="button">전체 보기</button></div>
-          <div id="context-project-list" class="project-list">
-            <p class="context-empty">확정된 프로젝트를 불러오는 중…</p>
-          </div>
+          <div class="section-title"><h3>연결</h3><button id="workspace-edit" type="button">변경</button></div>
+          <div id="workspace-card" class="workspace-card"></div>
+        </section>
+        <section class="context-section receipts-section">
+          <div class="section-title"><h3>최근 Receipt</h3><button id="receipts-refresh" type="button">새로고침</button></div>
+          <div id="receipts-list" class="receipts-list"><p class="empty">아직 변경 기록이 없습니다.</p></div>
         </section>
       </aside>
     </div>
 
-    <div class="context-scrim" aria-hidden="true"></div>
-
-    <nav class="mobile-nav" aria-label="모바일 탐색">
-      <button class="active" type="button" data-view="비서" aria-current="page"><svg><use href="#icon-home" /></svg><span>비서</span></button>
-      <button type="button" data-view="오늘"><svg><use href="#icon-calendar" /></svg><span>오늘</span><em>3</em></button>
-      <button type="button" data-view="프로젝트"><svg><use href="#icon-folder" /></svg><span>프로젝트</span></button>
-      <button type="button" data-view="프로젝트 개요"><svg><use href="#icon-overview" /></svg><span>개요</span></button>
-      <button type="button" data-view="받은함"><svg><use href="#icon-inbox" /></svg><span>받은함</span></button>
-      <button id="mobile-settings-button" type="button"><svg><use href="#icon-more" /></svg><span>더보기</span></button>
-    </nav>
-
-    <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
-      <div class="settings-sheet">
-        <header class="settings-header">
-          <div><p>PERSONAL OPS</p><h2 id="settings-title">비서 및 데이터 설정</h2></div>
-          <button id="settings-close" class="icon-button" type="button" aria-label="설정 닫기"><svg><use href="#icon-close" /></svg></button>
-        </header>
-        <div class="settings-content">
-          <section class="assistant-profile-settings">
-            <div class="settings-section-heading">
-              <div>
-                <h3>비서 구성</h3>
-                <p class="settings-description">비서의 관계와 대화 방식을 지정합니다. 보안, 승인과 데이터 저장 정책은 변경되지 않습니다.</p>
-              </div>
-              <span id="assistant-profile-version" class="settings-version">버전 1</span>
-            </div>
-            <form id="assistant-profile-form" class="assistant-profile-form">
-              <div class="profile-field-row">
-                <label>비서 이름<input id="assistant-profile-name" name="name" maxlength="50" required /></label>
-                <label>나를 부를 호칭<input id="assistant-owner-address" name="ownerAddress" maxlength="50" required /></label>
-              </div>
-              <label>역할<textarea id="assistant-role-description" name="roleDescription" maxlength="1000" rows="3" required></textarea></label>
-              <label>대화 방식<textarea id="assistant-communication-style" name="communicationStyle" maxlength="1000" rows="3" required></textarea></label>
-              <label>업무 원칙<textarea id="assistant-working-principles" name="workingPrinciples" maxlength="2000" rows="4" required></textarea></label>
-              <label>기준 시간대<input id="assistant-timezone" name="timezone" maxlength="100" placeholder="Asia/Seoul" required /></label>
-              <div class="profile-actions">
-                <p id="assistant-profile-status" aria-live="polite"></p>
-                <button id="assistant-profile-submit" class="primary-button" type="submit">변경 검토</button>
-              </div>
-            </form>
-          </section>
-
-          <section class="runtime-settings">
-            <div class="settings-section-heading">
-              <div>
-                <h3>AI 런타임</h3>
-                <p class="settings-description">개발 저장소와 분리된 서버 관리 작업공간에서 AI를 실행합니다.</p>
-              </div>
-              <span id="ai-runtime-status" class="runtime-badge">확인 중</span>
-            </div>
-          </section>
-
-          <section>
-            <h3>데이터 관리</h3>
-            <p class="settings-description">초기 개발 중 깨끗한 상태로 돌아가기 위한 도구입니다. CLI 로그인, 환경설정, Tailscale 구성은 삭제하지 않습니다.</p>
-            <div class="danger-actions">
-              <button type="button" data-reset-mode="chat">
-                <span><strong>대화 기록 삭제</strong><small>모든 비서 대화, 메시지와 AI 작업 기록을 비웁니다.</small></span>
-                <svg><use href="#icon-chevron" /></svg>
-              </button>
-              <button type="button" data-reset-mode="all">
-                <span><strong>모든 데이터 초기화</strong><small>대화와 메모를 비우고 비서 구성을 기본값으로 되돌립니다.</small></span>
-                <svg><use href="#icon-chevron" /></svg>
-              </button>
-            </div>
-          </section>
-
-          <section class="settings-debug-link">
-            <h3>개발 도구</h3>
-            <p class="settings-description">현재 SQLite 상태와 저장된 데이터를 읽기 전용으로 확인합니다.</p>
-            <button id="mobile-debug-button" class="quiet-button" type="button">데이터 디버그 열기</button>
-          </section>
-
-          <section id="destructive-confirmation" class="destructive-confirmation" hidden>
-            <span class="warning-mark">!</span>
-            <div>
-              <h3 id="confirmation-title">삭제 확인</h3>
-              <p id="confirmation-description"></p>
-              <p class="confirmation-hint">이 작업은 되돌릴 수 없습니다. 삭제 범위를 확인한 뒤 계속하세요.</p>
-              <div class="confirmation-actions">
-                <button id="confirmation-cancel" class="quiet-button" type="button">취소</button>
-                <button id="confirmation-submit" class="danger-button" type="button">영구 삭제</button>
-              </div>
-              <p id="settings-status" class="settings-status" aria-live="polite"></p>
-            </div>
-          </section>
+    <dialog id="setup-dialog" class="sheet-dialog">
+      <form id="setup-form" class="sheet">
+        <header><div><p>WORKOS CONNECTION</p><h2 id="setup-title">WorkOS 연결</h2></div></header>
+        <p class="sheet-description">Git 저장소 루트와 AGENTS.md를 확인합니다. 경로와 권한은 이 PC의 로컬 런타임 DB에만 저장됩니다.</p>
+        <label class="field">WorkOS 루트 경로<input id="workspace-path" name="rootPath" autocomplete="off" required /></label>
+        <div class="grant-grid">
+          <label><input id="grant-codex" type="checkbox" checked /><span><strong>Codex 허용</strong><small>필요한 WorkOS 파일을 모델이 읽을 수 있습니다.</small></span></label>
+          <label><input id="grant-grok" type="checkbox" checked /><span><strong>Grok 허용</strong><small>필요한 WorkOS 파일을 모델이 읽을 수 있습니다.</small></span></label>
         </div>
+        <div id="setup-validation" class="validation-box" hidden></div>
+        <div class="sheet-actions">
+          <button id="setup-cancel" class="secondary-button" type="button">취소</button>
+          <button class="primary-button" type="submit">검증하고 연결</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="settings-dialog" class="sheet-dialog">
+      <form id="profile-form" class="sheet wide-sheet">
+        <header><div><p>ASSISTANT PROFILE</p><h2>비서 설정</h2></div><button id="settings-close" class="icon-button" type="button">×</button></header>
+        <div class="form-grid">
+          <label class="field">비서 이름<input id="profile-name" required maxlength="50" /></label>
+          <label class="field">사용자 호칭<input id="profile-address" required maxlength="50" /></label>
+        </div>
+        <label class="field">역할<textarea id="profile-role" required maxlength="1000" rows="3"></textarea></label>
+        <label class="field">소통 방식<textarea id="profile-style" required maxlength="1000" rows="3"></textarea></label>
+        <label class="field">업무 원칙<textarea id="profile-principles" required maxlength="2000" rows="4"></textarea></label>
+        <label class="field">시간대<input id="profile-timezone" required maxlength="100" /></label>
+        <div class="sheet-actions"><button class="primary-button" type="submit">비서 설정 저장</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="diff-dialog" class="diff-dialog">
+      <div class="diff-sheet">
+        <header><div><p>VERSIONED RECEIPT</p><h2>변경 Diff</h2></div><button id="diff-close" class="icon-button" type="button">×</button></header>
+        <pre id="diff-content"></pre>
       </div>
     </dialog>
 
+    <div id="scrim" class="scrim"></div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script type="module" src="/app.js"></script>
   </body>

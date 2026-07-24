@@ -1,112 +1,97 @@
-import { AiConversationService, type AiStreamingProvider } from "../../src/ai/streaming-service.js";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+import { AiConversationService } from "../../src/ai/streaming-service.js";
+import type {
+  WorkspaceExecutionInput,
+  WorkspaceProvider,
+  WorkspaceProviderInput,
+} from "../../src/ai/workspace-provider.js";
 import { buildApp } from "../../src/app.js";
 import { loadConfig } from "../../src/config.js";
+import type { WorkspaceExecutionResult, WorkspaceTurnPlan } from "../../src/domain/workspace.js";
+import { GitWorkspace } from "../../src/infra/git-workspace.js";
 import { OpsStore } from "../../src/infra/store.js";
+import { createGitWorkspace } from "../helpers.js";
 
 const config = loadConfig();
-const store = new OpsStore(":memory:");
-const provider: AiStreamingProvider = {
-  async runTurn(input) {
-    await delay(150, input.signal);
-    const currentMessage = input.message.split("Current owner message:\n").at(-1)?.trim() ?? "";
-    const pendingId = /"pendingProposals":\[\{"id":"([^"]+)"/.exec(input.message)?.[1] ?? null;
-    const groundedReferenceId = /"retrievedEvidence":\{.*?"referenceId":"([^"]+)"/s.exec(input.message)?.[1] ?? null;
-    const envelope = currentMessage.includes("저장된 오메가")
-      ? {
-          reply: "저장된 근거에서 오메가 일정을 찾지 못했습니다.",
-          resolutions: [],
-          memoProposal: null,
-          grounding: { status: "insufficient", citedReferenceIds: [], conflicts: [] },
-        }
-      : currentMessage.includes("저장된 알파")
-      ? groundedReferenceId
-        ? {
-            reply: "저장된 근거에 따르면 알파 배포 일정은 금요일에 확인합니다.",
-            resolutions: [],
-            memoProposal: null,
-            grounding: { status: "grounded", citedReferenceIds: [groundedReferenceId], conflicts: [] },
-          }
-        : {
-            reply: "저장된 근거에서 알파 배포 일정을 찾지 못했습니다.",
-            resolutions: [],
-            memoProposal: null,
-            grounding: { status: "insufficient", citedReferenceIds: [], conflicts: [] },
-          }
-      : currentMessage.includes("알파 배포")
-      ? {
-          reply: "알파 배포 후속 조치로 이해했습니다.",
-          resolutions: [],
-          memoProposal: {
-            operation: "create",
-            targetMemoId: null,
-            supersedesProposalId: null,
-            memo: {
-              summary: "알파 배포 일정을 금요일에 확인한다.",
-              facets: [{ kind: "action", text: "민수에게 알파 배포 일정을 확인한다." }],
-              subjects: ["알파", "민수"],
-              timeReferences: [{ original: "금요일", interpreted: "2026-07-24", certainty: "explicit" }],
-              uncertainties: [],
-            },
-            projectProjections: [{
-              projectName: "알파",
-              aliases: ["알파 프로젝트"],
-              outcome: "알파 배포를 완료한다.",
-              currentState: "배포 일정을 확인하는 중이다.",
-              actions: [{
-                title: "민수에게 알파 배포 일정을 확인한다.",
-                status: "open",
-                plannedOn: "2026-07-24",
-                dueOn: null,
-              }],
-              decisions: [],
-              dependencies: [],
-              risks: [],
-              meetings: [],
-              judgments: [],
-            }],
-          },
-          grounding: { status: "not_applicable", citedReferenceIds: [], conflicts: [] },
-        }
-      : currentMessage.includes("저장해") && pendingId
-        ? {
-            reply: "비서 메모로 저장했습니다.",
-            resolutions: [{ proposalId: pendingId, action: "confirm" }],
-            memoProposal: null,
-            grounding: { status: "not_applicable", citedReferenceIds: [], conflicts: [] },
-          }
-        : {
-            reply: "구조화 응답 완료",
-            resolutions: [],
-            memoProposal: null,
-            grounding: { status: "not_applicable", citedReferenceIds: [], conflicts: [] },
-          };
-    const text = JSON.stringify(envelope);
+const root = resolve("var/playwright/e2e-runtime");
+if (root.toLowerCase().startsWith(resolve("var/playwright").toLowerCase())) {
+  rmSync(root, { recursive: true, force: true });
+}
+mkdirSync(root, { recursive: true });
+const vault = join(root, "synthetic-workos");
+createGitWorkspace(vault);
+
+const provider: WorkspaceProvider = {
+  async plan(input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
+    await delay(80, input.signal);
+    if (input.message.includes("일정")) {
+      return {
+        mode: "observe",
+        summary: "Read schedule",
+        reply: "합성 WorkOS에는 오늘 등록된 일정이 없습니다.",
+        risk: "low",
+        expectedPaths: [],
+        operations: ["read meeting notes"],
+        capabilities: ["local"],
+        rationale: "읽기 질문입니다.",
+        requiresApproval: false,
+      };
+    }
+    const govern = input.message.includes("AGENTS");
     return {
-      text,
-      usage: { inputTokens: 4, cachedInputTokens: 0, outputTokens: 3, reasoningTokens: 0 },
-      durationMs: 150,
-      providerThreadId: `e2e-${input.provider}`,
-      streamMode: "buffered",
+      mode: govern ? "govern" : "execute",
+      summary: govern ? "Update AGENTS instructions" : "Update README note",
+      reply: govern ? "운영 규칙 변경은 승인이 필요합니다." : "README 변경을 준비했습니다.",
+      risk: govern ? "high" : "low",
+      expectedPaths: [govern ? "AGENTS.md" : "README.md"],
+      operations: [govern ? "edit agent contract" : "edit note"],
+      capabilities: ["local"],
+      rationale: govern ? "AGENTS.md는 Govern 영역입니다." : "사용자가 단일 문서 수정을 요청했습니다.",
+      requiresApproval: govern,
+    };
+  },
+  async execute(input: WorkspaceExecutionInput): Promise<WorkspaceExecutionResult> {
+    await delay(100, input.signal);
+    const path = input.plan.expectedPaths[0]!;
+    const target = join(input.rootPath, path);
+    const current = readFileSync(target, "utf8");
+    writeFileSync(target, `${current.trimEnd()}\n\nAssistant verified change.\n`, "utf8");
+    return {
+      reply: `${path}를 변경하고 검증했습니다.`,
+      semanticSummary: `Update ${path}`,
+      changedPaths: [path],
+      validation: ["Markdown file remains readable"],
     };
   },
 };
-const aiConversationService = new AiConversationService(store, provider);
+
+const store = new OpsStore(join(root, "workos-runtime.db"));
+const workspace = new GitWorkspace();
+const proposal = store.createWorkspaceConfigProposal({
+  rootPath: vault,
+  codexGranted: true,
+  grokGranted: true,
+  validation: workspace.validate(vault),
+});
+store.confirmWorkspaceConfigProposal(proposal.id);
+const service = new AiConversationService(store, provider, workspace);
 const app = await buildApp({
   store,
-  aiConversationService,
-  aiRuntime: { environment: "test", mode: "managed", isolated: true },
+  workspace,
+  aiConversationService: service,
+  environment: "test",
 });
-
 app.addHook("onClose", async () => {
-  await aiConversationService.close();
+  await service.close();
   store.close();
 });
-
 await app.listen({ host: config.host, port: config.port });
 
 function delay(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
+  return new Promise((resolveDelay, reject) => {
+    const timer = setTimeout(resolveDelay, ms);
     signal.addEventListener("abort", () => {
       clearTimeout(timer);
       reject(new DOMException("aborted", "AbortError"));

@@ -30,7 +30,8 @@ export default defineConfig({
           OPS_HOST: "127.0.0.1",
           OPS_PORT: "4321",
           OPS_DATA_DIR: "./var/playwright/data",
-          OPS_AI_WORKING_DIR: "./var/playwright/ai-workspace",
+          OPS_RUNTIME_DIR: "./var/playwright/runtime",
+          OPS_RUNTIME_ENV: "test",
         },
       } }),
 });

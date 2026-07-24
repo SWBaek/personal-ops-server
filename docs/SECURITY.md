@@ -1,143 +1,59 @@
-# Security Model
+# Security
 
-## Security objective
+## Trust model
 
-Personal Ops Server gives AI enough context and bounded authority to act as a professional assistant without giving a model ownership of the host computer, credentials, or canonical data.
+Trusted deterministic components:
 
-AI is required for the product's intelligent operation, but it remains an untrusted decision component inside an application-owned security and transaction boundary.
+- server input and schema validation;
+- provider grants and authority policy;
+- WorkOS root validation;
+- job state transitions and idempotency;
+- changed-path comparison;
+- local Git commit and Undo preconditions.
 
-## Assets
+Untrusted inputs:
 
-- raw personal and professional evidence;
-- projects, actions, schedules, people, decisions, dependencies, risks, and knowledge;
-- user preferences, corrections, and relationship context;
-- Codex and Grok subscription sessions;
-- local filesystem and operating-system access;
-- private-network identity and future application identity;
-- proposals, approvals, receipts, audit history, backups, and exports.
+- owner-entered natural language until validated at the boundary;
+- model output;
+- WorkOS files and imported content;
+- CLI stdout/stderr;
+- optional browser and network content.
 
-## Trust boundaries
+Untrusted content can inform a result but cannot grant tools, paths, network access, or authority.
 
-1. A browser request is untrusted even when it arrives through the owner's tailnet.
-2. User text may contain mistakes or ambiguous authority.
-3. Imported documents, meeting material, web pages, email, and retrieved knowledge may contain prompt injection or misleading content.
-4. Model output, tool arguments, summaries, and confidence statements are untrusted until validated.
-5. Specialist agents do not inherit authority merely because the chief assistant delegated a task.
-6. CLI stdout, stderr, session identifiers, and protocol events are provider-controlled input.
-7. Subscription credentials, browser sessions, OS keyrings, and credential files are never application data.
-8. The optional legacy WorkOS reference is outside standing project authority and must be separately scoped; the product never requires access to it.
+## Filesystem access
 
-## Authority model
+The owner explicitly configures one exact WorkOS Git root and grants access per provider. The server rejects missing directories, nested paths that are not the exact Git root, and roots without `AGENTS.md`.
 
-### Observe
+Read-only turns may inspect the configured root. Mutation requires a clean worktree. Paths in plans and results must be relative, in-root, and free from traversal. The browser does not offer arbitrary path browsing or command execution.
 
-Read, retrieve, research, compare, summarize, and diagnose within the authorized data scope. Observe may create transient findings but does not change canonical state.
+## Authority
 
-### Operate
+- Observe cannot mutate.
+- Operate is bounded by the owner’s current request and server-validated paths.
+- Govern requires a visible plan and separate approval.
+- External network, MCP/apps, subagents, external review, remote Git, deletion, moves, bulk rewrites, and policy changes are Govern capabilities.
 
-Apply a bounded low-risk domain command explicitly requested by the owner. The request itself authorizes that exact operation; duplicate approval is unnecessary. The application validates the target, before state, after state, conflicts, and idempotency key before commit.
+The provider must not commit, push, pull, or change remotes. The application alone creates local receipt commits after validation.
 
-Examples include completing or rescheduling a known action, recording a supplied decision, or linking an already-authorized source.
+## Data and credentials
 
-### Govern
+Only official subscription-authenticated Codex and Grok CLIs are allowed. The application never reads or transports their tokens. Raw stderr, environment dumps, hidden reasoning, and provider thread IDs do not reach the browser.
 
-Require a separately visible approval for:
+SQLite may contain the local WorkOS path and conversation text. It stays under ignored local runtime storage and must never be committed. WorkOS content is not copied into the runtime database.
 
-- deletion, archival with loss of normal visibility, or bulk rewrite;
-- migration or canonical-source changes;
-- external transmission of private content;
-- sending messages, publishing, spending money, or accepting terms;
-- expanding an agent's filesystem, tool, network, or data scope;
-- changing authority policy, role instructions, or trusted system configuration.
+## Synchronization and remote access
 
-Proactive agents remain in Observe unless a specific pre-authorized automation contract exists. A recommendation is not mutation authority.
+Obsidian Sync is the primary WorkOS synchronization mechanism and is managed outside the application. Remote Git is optional and never automatic.
 
-## Required controls
+Fastify binds to localhost. Remote browser access uses the owner-only tailnet through Tailscale Serve HTTPS. Funnel, public tunnels, public port forwarding, and unauthenticated wider-network access are prohibited.
 
-### Network and identity
+## Failure behavior
 
-- Bind the application to localhost.
-- Use Tailscale Serve for private remote access; never use public ingress or Funnel.
-- Keep an explicit owner-only user model even while the tailnet has one member.
-- Add application authentication before enabling external communication, consequential integrations, or broader access.
-- Rate-limit AI jobs, approvals, and future authentication attempts.
-
-### AI and tools
-
-- Invoke only official locally installed subscription-authenticated `codex` and `grok` CLIs.
-- Spawn binaries directly with `shell: false` and fixed command shapes.
-- Never accept a browser-provided executable, flag list, working directory, shell command, SQL statement, or filesystem path.
-- Run provider CLIs from a server-managed directory outside Git projects and inherited `AGENTS.md` files. Allow an operator-only `.env` path override only after the same isolation validation.
-- Treat the owner-editable assistant profile as subordinate preferences. It cannot override system security, authority, tools, validation, storage, or approval rules, and profile changes require a separate visible confirmation.
-- Keep provider credentials and session files outside application storage and prompts.
-- Give roles allowlisted application-domain tools rather than general shell or filesystem access.
-- Bound context by goal, role, source scope, and token budget.
-- Reject answer citations whose application record IDs were not present in the bounded context package.
-- Validate citations as exact version-pinned references and reject superseded versions or sources outside the selected project manifest.
-- Let deterministic server code classify retrieval coverage. A model may not turn partial or unknown evidence into a closed-world claim that an item is all, unique, or absent.
-- Treat provider reasoning, hidden traces, and raw diagnostics as non-displayable internal data.
-- Keep development debugging read-only and dataset-allowlisted. It may expose application-owned conversation and memo rows, but never arbitrary SQL, provider thread identifiers, client request keys, database paths, credentials, or SQLite metadata outside the allowlist.
-
-### Data and provenance
-
-- Preserve original evidence separately from AI-generated interpretation.
-- Record source references for material facts, decisions, actions, and knowledge.
-- Mark external sources and imported text as untrusted content in agent context.
-- Keep private data out of logs, fixtures, screenshots, error responses, and public commits.
-- Do not transmit legacy or current personal data to another model or service without explicit model and content scope.
-
-### Mutation and audit
-
-- Require schema-constrained intents for every agent-generated mutation.
-- Enforce domain invariants, authority, current-state preconditions, and idempotency deterministically.
-- Serialize conflicting writes.
-- Separate proposal and apply phases for Govern operations.
-- Require a separate final confirmation step for development data deletion, reject it while AI jobs are active, and limit it to explicitly enumerated application-owned tables in one transaction.
-- Store a receipt with actor/role, request, affected objects, before/after summary, evidence references, and undo information.
-- Fail closed when intent, target, authority, source, or current state is ambiguous.
-- Reconcile jobs after restart without blindly retrying a mutation whose outcome is uncertain.
-
-### Specialist isolation
-
-- A specialist receives only the task goal and selected context needed for its role.
-- Specialists cannot widen their own tools, source scope, mutation scope, or delegation depth.
-- A specialist result is evidence or a proposal to the chief assistant until the application commits a validated command.
-- Role-specific memory cannot override shared canonical state or owner corrections.
-
-### Availability and recovery
-
-- AI unavailability blocks or queues intelligent work; never report a synthetic completion.
-- Preserve durable job and approval state across process restarts.
-- Back up the database and evidence store and test restoration.
-- Export canonical state in inspectable formats so provider or application replacement is possible.
-
-## Prompt-injection posture
-
-Retrieved content is data, not instruction. The context builder should delimit sources and attach origin and trust metadata. Agents must ignore instructions embedded in evidence that request tool use, credential access, policy changes, or data transmission.
-
-Any workflow that combines untrusted evidence with a powerful tool must use one or more of:
-
-- read-only tools;
-- a typed narrow operation;
-- deterministic validation;
-- an isolated execution environment;
-- explicit human approval.
-
-Memory writes from untrusted sources require special caution. A statement in a document is not a user preference, correction, or durable fact merely because a model extracted it.
-
-## Prohibited designs
-
-- browser terminal, remote shell, or raw SQL console;
-- command strings constructed from user or model text;
-- API-key or direct HTTP model integration;
-- reading or copying CLI authentication files, browser cookies, or OS credential stores;
-- provider app-server or JSON-RPC exposed to remote clients;
-- a role with unrestricted home-directory access;
-- per-agent databases that become competing sources of truth;
-- silent autonomous deletion, migration, external messaging, or bulk rewrite;
-- accepting an agent's confidence score as authorization or factual proof;
-- self-modifying production skills or policies without evaluation, versioning, approval, and rollback.
-
-## Development exception
-
-During active development, the owner's single-member tailnet may temporarily access read-only AI chat without application authentication. This exception does not authorize public exposure, external messaging, legacy-vault access, or consequential autonomous mutations. It must be revisited before the refoundation enables applied agent operations beyond explicitly requested local domain changes.
+- unavailable AI reports a durable failure rather than fabricated completion;
+- dirty WorkOS blocks mutation;
+- malformed plans/results fail closed;
+- unexpected or residual edits enter `needs_review`;
+- provider cancellation and restart preserve inspectable status;
+- Undo rejects a dirty tree, divergent HEAD, non-latest receipt, or already-undone receipt;
+- no failure path pushes to a Git remote or alters Obsidian Sync configuration.
