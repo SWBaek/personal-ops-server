@@ -8,7 +8,7 @@ Each decision is **Active**, **Superseded**, or **Transitional**.
 
 GitHub Issue: #29.
 
-Grok direct answers still require `end` with `stopReason: EndTurn`. After that event, the adapter may accept a `result` envelope only when any included answer exactly matches the already completed final segment, plus a content-free `usage` envelope. Later text, thought, tool, mismatched result, or unknown events remain failures. This preserves terminal integrity across CLI envelope changes without storing or exposing provider traces.
+Grok direct answers require a terminal `end` and a non-empty final text segment. `EndTurn` is the normal reason; Grok 0.2.111 also emits `Cancelled` with exit code zero after a complete answer for some multi-step requests. That case is accepted because owner cancellation follows the separate AbortSignal path, kills the process, and never reaches output parsing. After the terminal event, the adapter may accept a `result` envelope only when any included answer exactly matches the completed final segment, plus a content-free `usage` envelope. Max-turn exhaustion, missing text, later text, thought, tool, mismatched result, and unknown events remain failures.
 
 ## 2026-07-24 — Owner-visible tool traces are permitted on the private tailnet
 

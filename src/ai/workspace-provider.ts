@@ -244,7 +244,9 @@ export function parseDirectProviderText(provider: AiProviderId, output: string):
           current = "";
         }
         if (event.type === "end") {
-          if (event.stopReason !== "EndTurn") throw new Error("Grok turn did not complete");
+          if (!["EndTurn", "Cancelled"].includes(String(event.stopReason))) {
+            throw new Error("Grok turn did not complete");
+          }
           completed = true;
         }
       }

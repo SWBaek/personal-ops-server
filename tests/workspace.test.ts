@@ -240,6 +240,26 @@ test("Grok parser accepts matching post-terminal envelopes and rejects later con
   );
 });
 
+test("Grok parser preserves a complete answer when the CLI exits zero with Cancelled", () => {
+  const answer = "완성된 최종 답변";
+  assert.equal(
+    parseDirectProviderText("grok", [
+      JSON.stringify({ type: "thought", data: "intermediate" }),
+      JSON.stringify({ type: "text", data: answer }),
+      JSON.stringify({ type: "end", stopReason: "Cancelled", num_turns: 2 }),
+    ].join("\n")),
+    answer,
+  );
+  assert.throws(
+    () => parseDirectProviderText("grok", JSON.stringify({
+      type: "end",
+      stopReason: "Cancelled",
+      num_turns: 2,
+    })),
+    /AI provider returned no usable answer/u,
+  );
+});
+
 test("only explicit change commands enter the mutation workflow", () => {
   assert.equal(requestsWorkspaceMutation("내 AI Task에 관해 요약해줘"), false);
   assert.equal(requestsWorkspaceMutation("수정된 파일을 보여줘"), false);
