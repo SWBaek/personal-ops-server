@@ -8,6 +8,13 @@ For ordinary questions, both adapters receive the owner’s request unchanged an
 
 Processes use argument arrays with `shell: false`. User text is never interpolated into a shell command. Output and runtime are bounded; raw stderr, hidden reasoning, credentials, and provider session identifiers stay server-side.
 
+Every invocation includes a concrete `--model` value. The product does not expose or persist a generic `default` model because that would let a CLI upgrade silently change which model handles the owner's work. The versioned product catalog follows the locally verified, list-visible CLI catalog:
+
+- Codex: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, and `gpt-5.3-codex-spark`;
+- Grok: `grok-4.5`.
+
+The initial concrete selections are `gpt-5.6-sol` for Codex and `grok-4.5` for Grok. Existing ledger rows that stored `default` are migrated to those provider-specific identifiers.
+
 ## Codex
 
 Availability:
@@ -15,6 +22,7 @@ Availability:
 ```powershell
 codex --version
 codex login status
+codex debug models
 ```
 
 Direct answers use `codex exec` with JSON event framing, ephemeral state, read-only sandbox, and the WorkOS root as `-C`; the final agent message is passed through without a structured output schema.
@@ -31,6 +39,7 @@ Availability:
 
 ```powershell
 grok version
+grok models
 ```
 
 Direct answers run in the WorkOS root with read-only permission, planning behavior disabled, provider JSON framing, no memory, disabled web search, and no subagents. The outer framing is removed and its final text is passed through unchanged.

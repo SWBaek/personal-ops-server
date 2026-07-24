@@ -7,6 +7,9 @@ test("desktop keeps conversation between navigation and WorkOS context", async (
   await expect(page.locator("#git-badge")).toContainText("Clean");
   await expect(page.locator(".rail")).toBeVisible();
   await expect(page.locator(".context-panel")).toBeVisible();
+  await expect(page.locator("#model-select")).toHaveValue("gpt-5.6-sol");
+  await expect(page.locator("#model-select option")).toHaveCount(7);
+  await expect(page.locator("#model-select option[value=default]")).toHaveCount(0);
   const metrics = await page.evaluate<{ width: number; viewport: number }>(
     "({ width: document.documentElement.scrollWidth, viewport: window.innerWidth })",
   );
@@ -161,6 +164,8 @@ test("provider switch keeps one timeline and marks the provider segment", async 
   await expect(page.locator("#send-button")).toBeEnabled();
   await page.locator("#provider-select").selectOption("grok");
   await expect(page.locator("#provider-select")).toHaveValue("grok");
+  await expect(page.locator("#model-select")).toHaveValue("grok-4.5");
+  await expect(page.locator("#model-select option")).toHaveCount(1);
   await page.locator("#message-input").fill("오늘 일정은?");
   await page.locator("#send-button").click();
   await expect(page.locator(".message.assistant").last().locator(".message-meta")).toContainText("grok");

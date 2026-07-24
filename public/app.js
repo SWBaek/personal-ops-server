@@ -480,9 +480,10 @@ function updateDependentOptions() {
 }
 
 function selection() {
+  if (!modelSelect.value) throw new Error("구체적인 AI 모델을 선택해주세요.");
   return {
     provider: providerSelect.value,
-    model: modelSelect.value || "default",
+    model: modelSelect.value,
     reasoningEffort: reasoningSelect.value || "default",
   };
 }

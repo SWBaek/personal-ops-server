@@ -92,6 +92,40 @@ test("first-run configuration validates Git and exposes only WorkOS-native APIs"
   }
 });
 
+test("AI options expose only explicit CLI models and reject a generic default", async () => {
+  const temporary = mkdtempSync(join(tmpdir(), "ops-app-options-"));
+  const store = new OpsStore(join(temporary, "runtime.db"));
+  const workspace = new GitWorkspace();
+  const service = new AiConversationService(store, new NoopProvider(), workspace);
+  const app = await buildApp({ store, workspace, aiConversationService: service });
+  try {
+    const options = await app.inject({ method: "GET", url: "/api/ai/options" });
+    assert.equal(options.statusCode, 200);
+    assert.deepEqual(
+      options.json().providers.find((provider: { id: string }) => provider.id === "grok").models,
+      [{ id: "grok-4.5", label: "Grok 4.5" }],
+    );
+    assert.equal(
+      options.json().providers.some(
+        (provider: { models: Array<{ id: string }> }) =>
+          provider.models.some((model) => model.id === "default"),
+      ),
+      false,
+    );
+
+    const rejected = await app.inject({
+      method: "POST",
+      url: "/api/ai/conversations",
+      payload: { provider: "codex", model: "default", reasoningEffort: "high" },
+    });
+    assert.equal(rejected.statusCode, 400);
+  } finally {
+    await app.close();
+    store.close();
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
 test("conversation question completes through one direct provider answer", async () => {
   const temporary = mkdtempSync(join(tmpdir(), "ops-app-"));
   const vault = join(temporary, "vault");
@@ -111,7 +145,7 @@ test("conversation question completes through one direct provider answer", async
     const conversation = await app.inject({
       method: "POST",
       url: "/api/ai/conversations",
-      payload: { provider: "codex", model: "default", reasoningEffort: "high" },
+      payload: { provider: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" },
     });
     assert.equal(conversation.statusCode, 201);
     const conversationId = conversation.json().conversation.id as string;
@@ -121,7 +155,7 @@ test("conversation question completes through one direct provider answer", async
       payload: {
         clientRequestId: "db5dde63-ed47-4476-a1fe-78cbdab56247",
         message: "WorkOS 규칙을 알려줘",
-        model: "default",
+        model: "gpt-5.6-sol",
         reasoningEffort: "high",
       },
     });

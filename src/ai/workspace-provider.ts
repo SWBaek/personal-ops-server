@@ -111,7 +111,7 @@ export function buildDirectInvocation(input: WorkspaceProviderInput): Invocation
       "--disable",
       "multi_agent",
     ];
-    if (input.model !== "default") args.push("--model", input.model);
+    args.push("--model", input.model);
     if (input.reasoningEffort !== "default") {
       args.push("-c", `model_reasoning_effort="${input.reasoningEffort}"`);
     }
@@ -134,7 +134,7 @@ export function buildDirectInvocation(input: WorkspaceProviderInput): Invocation
     "--no-memory",
     "--no-subagents",
   ];
-  if (input.model !== "default") args.push("--model", input.model);
+  args.push("--model", input.model);
   if (input.reasoningEffort !== "default") {
     args.push("--reasoning-effort", input.reasoningEffort);
   }
@@ -166,7 +166,7 @@ export function buildInvocation(input: WorkspaceProviderInput & {
     if (!has("web")) args.push("-c", 'web_search="disabled"');
     if (!has("mcp")) args.push("-c", "mcp_servers={}", "--disable", "apps");
     if (!has("subagents")) args.push("--disable", "multi_agent");
-    if (input.model !== "default") args.push("--model", input.model);
+    args.push("--model", input.model);
     if (input.reasoningEffort !== "default") {
       args.push("-c", `model_reasoning_effort="${input.reasoningEffort}"`);
     }
@@ -189,7 +189,7 @@ export function buildInvocation(input: WorkspaceProviderInput & {
   ];
   if (!has("web")) args.push("--disable-web-search");
   if (!has("subagents")) args.push("--no-subagents");
-  if (input.model !== "default") args.push("--model", input.model);
+  args.push("--model", input.model);
   if (input.reasoningEffort !== "default") {
     args.push("--reasoning-effort", input.reasoningEffort);
   }

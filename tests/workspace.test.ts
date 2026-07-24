@@ -84,7 +84,7 @@ test("parses safe relative paths and rejects Git internals", () => {
 test("provider invocations discover WorkOS instructions and separate plan from write", () => {
   const base = {
     provider: "codex" as const,
-    model: "default",
+    model: "gpt-5.6-sol",
     reasoningEffort: "high",
     rootPath: "C:\\synthetic\\WorkOs",
     message: "test",
@@ -97,6 +97,10 @@ test("provider invocations discover WorkOS instructions and separate plan from w
   };
   const plan = buildInvocation({ ...base, write: false, capabilities: ["local"] });
   assert.ok(plan.args.includes("read-only"));
+  assert.deepEqual(plan.args.slice(plan.args.indexOf("--model"), plan.args.indexOf("--model") + 2), [
+    "--model",
+    "gpt-5.6-sol",
+  ]);
   assert.ok(!plan.args.includes("--ignore-user-config"));
   assert.ok(!plan.args.some((value) => value.includes("project_root_markers")));
 
@@ -108,7 +112,7 @@ test("provider invocations discover WorkOS instructions and separate plan from w
 test("direct provider invocations bypass structured planning and preserve the owner request", () => {
   const base = {
     provider: "codex" as const,
-    model: "default",
+    model: "gpt-5.6-sol",
     reasoningEffort: "high",
     rootPath: "C:\\synthetic\\WorkOs",
     message: "내 AI Task를 요약해줘",
@@ -118,12 +122,20 @@ test("direct provider invocations bypass structured planning and preserve the ow
   const codex = buildDirectInvocation(base);
   assert.equal(codex.stdin, base.message);
   assert.ok(codex.args.includes("read-only"));
+  assert.deepEqual(codex.args.slice(codex.args.indexOf("--model"), codex.args.indexOf("--model") + 2), [
+    "--model",
+    "gpt-5.6-sol",
+  ]);
   assert.ok(!codex.args.includes("--output-schema"));
 
-  const grok = buildDirectInvocation({ ...base, provider: "grok" });
+  const grok = buildDirectInvocation({ ...base, provider: "grok", model: "grok-4.5" });
   assert.ok(grok.args.includes("--no-plan"));
   assert.ok(grok.args.includes("--verbatim"));
   assert.ok(!grok.args.includes("--json-schema"));
+  assert.deepEqual(grok.args.slice(grok.args.indexOf("--model"), grok.args.indexOf("--model") + 2), [
+    "--model",
+    "grok-4.5",
+  ]);
   assert.equal(grok.args.at(-1), base.message);
 });
 
