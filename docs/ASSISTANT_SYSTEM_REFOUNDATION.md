@@ -12,7 +12,8 @@ The accepted product correction is simpler: use the actual WorkOS as the require
 - Codex and Grok run in the configured WorkOS root and inherit its instructions.
 - The browser provides one conversation, configuration, planning, approval, activity, receipts, diff, and Undo.
 - SQLite stores only runtime and audit state.
-- Every turn begins read-only.
+- Ordinary questions use one read-only CLI invocation and preserve its final answer.
+- Explicit mutations begin with a structured read-only plan.
 - Mutations are bounded by a validated plan, clean Git state, and risk policy.
 - Successful mutations become one local Git receipt commit.
 - Obsidian Sync is primary synchronization; remote Git is optional and not automated.
@@ -28,7 +29,7 @@ The accepted product correction is simpler: use the actual WorkOS as the require
 
 ### Runtime
 
-- common plan/result schemas;
+- direct-answer adapters without output schemas plus common mutation plan/result schemas;
 - Codex read-only planning and workspace-write execution;
 - Grok planning and accepted-edit execution;
 - disabled external capabilities by default;

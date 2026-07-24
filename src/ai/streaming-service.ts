@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   providerGranted,
+  requestsWorkspaceMutation,
   type AiProviderId,
   type WorkspaceTurnPlan,
 } from "../domain/workspace.js";
@@ -47,7 +48,10 @@ export class AiConversationService {
   }
 
   enqueue(jobId: string): void {
-    queueMicrotask(() => void this.#plan(jobId));
+    const job = this.#store.getAiJob(jobId);
+    const userMessage = job ? this.#store.getAiMessage(job.userMessageId) : null;
+    const mutationRequested = Boolean(userMessage && requestsWorkspaceMutation(userMessage.content));
+    queueMicrotask(() => void (mutationRequested ? this.#plan(jobId) : this.#answer(jobId)));
   }
 
   snapshot(jobId: string): AiJobSnapshot | null {
@@ -162,6 +166,50 @@ export class AiConversationService {
   async close(): Promise<void> {
     for (const controller of this.#controllers.values()) controller.abort();
     this.#controllers.clear();
+  }
+
+  async #answer(jobId: string): Promise<void> {
+    const job = this.#store.getAiJob(jobId);
+    if (!job || job.status !== "queued") return;
+    if (!this.#acquire(job.provider)) {
+      this.#fail(job, "선택한 provider가 이미 다른 요청을 처리하고 있습니다.");
+      return;
+    }
+    const controller = new AbortController();
+    this.#controllers.set(job.id, controller);
+    try {
+      const configuration = this.#requireConfiguration();
+      if (!providerGranted(configuration, job.provider)) {
+        throw new Error(`${job.provider}의 WorkOS 접근 권한이 설정에서 허용되지 않았습니다.`);
+      }
+      const validation = this.#workspace.validate(configuration.rootPath);
+      if (!validation.valid) throw new Error(validation.errors.join("; "));
+      const userMessage = this.#store.getAiMessage(job.userMessageId)!;
+      this.#store.transitionJob(job.id, "planning", { plan: null, error: null });
+      this.#emit(job.id, { type: "status", status: "planning" });
+      this.#activity(job.id, "reading", `${job.provider}가 WorkOS에서 직접 답변합니다.`);
+      const answer = await this.#provider.answer({
+        provider: job.provider,
+        model: job.model,
+        reasoningEffort: job.reasoningEffort,
+        rootPath: configuration.rootPath,
+        message: userMessage.content,
+        profile: this.#store.getAssistantProfile(),
+        signal: controller.signal,
+      });
+      this.#store.transitionJob(job.id, "succeeded", {
+        plan: null,
+        content: answer,
+        error: null,
+      });
+      this.#activity(job.id, "validation", "CLI 최종 답변을 그대로 전달했으며 WorkOS 변경은 없습니다.");
+      this.#emit(job.id, { type: "completed", snapshot: this.snapshot(job.id)! });
+    } catch (error) {
+      this.#fail(job, safeError(error));
+    } finally {
+      this.#controllers.delete(job.id);
+      this.#release(job.provider);
+    }
   }
 
   async #plan(jobId: string): Promise<void> {

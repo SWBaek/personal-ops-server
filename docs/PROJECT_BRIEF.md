@@ -10,8 +10,9 @@ The previous application attempted to reproduce WorkOS content in SQLite through
 
 Keep the existing responsive browser shell and connect each assistant turn directly to a user-configured WorkOS root:
 
-- preflight is always read-only and returns a schema-validated plan;
-- Observe returns the answer immediately;
+- ordinary questions invoke the selected CLI once in read-only mode and preserve its final text;
+- ambiguous requests default to the read-only direct-answer path;
+- explicit mutation commands begin with a read-only schema-validated plan;
 - low-risk Operate may execute the exact requested local change;
 - Govern requires a separate visible approval;
 - execution occurs in the WorkOS root with provider-specific adapters;
@@ -43,7 +44,7 @@ The browser never exposes a free-form command or arbitrary path. WorkOS content 
 
 - first-run WorkOS selection validates Git root and root `AGENTS.md`;
 - provider grants are explicit and configurable;
-- Codex and Grok use the same provider-independent plan/result contract;
+- Codex and Grok use the same direct-answer behavior and the same provider-independent mutation plan/result contract;
 - a read-only question changes no files;
 - a bounded edit produces a local commit and receipt;
 - Govern waits for visible approval;

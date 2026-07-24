@@ -148,7 +148,7 @@ async function sendMessage(event) {
   input.value = "";
   input.style.height = "auto";
   renderMessages();
-  setBusy(true, "읽기 전용 사전계획을 시작합니다.");
+  setBusy(true, "선택한 CLI가 WorkOS에서 바로 답변합니다.");
   try {
     const result = await request(`/api/ai/conversations/${state.conversation.id}/messages`, {
       method: "POST",
@@ -179,7 +179,7 @@ function followJob(jobId) {
   source.addEventListener("status", (event) => {
     const status = JSON.parse(event.data).status;
     composerStatus.textContent = status === "planning"
-      ? "WorkOS를 읽고 사전계획을 작성하고 있습니다."
+      ? "WorkOS에서 요청을 처리하고 있습니다."
       : "승인된 범위에서 WorkOS를 수정하고 있습니다.";
   });
   source.addEventListener("activity", (event) => {
@@ -242,7 +242,7 @@ function renderMessage(message) {
   meta.className = "message-meta";
   meta.textContent = message.role === "user" ? "OWNER" : `${message.provider || "AI"} · ${message.status || ""}`;
   const body = document.createElement("div");
-  body.textContent = message.content || (message.role === "assistant" ? "사전계획을 준비하고 있습니다…" : "");
+  body.textContent = message.content || (message.role === "assistant" ? "응답을 준비하고 있습니다…" : "");
   bubble.append(meta, body);
   if (message.activity?.length) {
     const list = document.createElement("div");
@@ -498,7 +498,7 @@ function setBusy(value, text) {
   reasoningSelect.disabled = value;
   cancelButton.hidden = !value;
   if (text) composerStatus.textContent = text;
-  else if (!value) composerStatus.textContent = "모든 요청은 읽기 전용 사전계획을 먼저 거칩니다.";
+  else if (!value) composerStatus.textContent = "질문은 CLI가 바로 답하고, 명시적 변경 요청만 계획과 검증을 거칩니다.";
 }
 
 function openContext() {
