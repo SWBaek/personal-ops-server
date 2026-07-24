@@ -144,7 +144,7 @@ function setupFixture() {
   store.confirmWorkspaceConfigProposal(proposal.id);
   const conversation = store.createAiConversation({
     provider: "codex",
-    model: "default",
+    model: "gpt-5.6-sol",
     reasoningEffort: "high",
   });
   return {
@@ -165,7 +165,7 @@ function createTurn(store: OpsStore, conversationId: string, message: string): s
     conversationId,
     clientRequestId: crypto.randomUUID(),
     message,
-    model: "default",
+    model: "gpt-5.6-sol",
     reasoningEffort: "high",
   }).job.id;
 }

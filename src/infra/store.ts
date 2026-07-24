@@ -9,6 +9,7 @@ import {
   type AssistantProfile,
   type AssistantProfileDraft,
 } from "../domain/assistant-profile.js";
+import { initialModelFor } from "../domain/ai-models.js";
 import type {
   AiProviderId,
   WorkspaceConfiguration,
@@ -630,7 +631,12 @@ export class OpsStore {
   }
 
   #migrate(): void {
-    this.#db.exec(`
+    const currentVersion = Number(
+      (this.#db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
+    );
+    if (currentVersion === 0) {
+      this.#db.exec(`
+      BEGIN IMMEDIATE;
       CREATE TABLE IF NOT EXISTS assistant_profiles (
         id TEXT PRIMARY KEY CHECK (id = 'chief-assistant'),
         version INTEGER NOT NULL,
@@ -741,7 +747,38 @@ export class OpsStore {
       CREATE INDEX IF NOT EXISTS idx_ai_jobs_status
         ON ai_jobs (status, created_at);
       PRAGMA user_version = 1;
+      COMMIT;
     `);
+    }
+
+    const schemaVersion = Number(
+      (this.#db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
+    );
+    if (schemaVersion < 2) {
+      this.#db.exec(`
+        BEGIN IMMEDIATE;
+        UPDATE ai_conversations
+           SET default_model = CASE provider
+             WHEN 'codex' THEN '${initialModelFor("codex")}'
+             WHEN 'grok' THEN '${initialModelFor("grok")}'
+           END
+         WHERE default_model = 'default';
+        UPDATE ai_messages
+           SET model = CASE provider
+             WHEN 'codex' THEN '${initialModelFor("codex")}'
+             WHEN 'grok' THEN '${initialModelFor("grok")}'
+           END
+         WHERE model = 'default';
+        UPDATE ai_jobs
+           SET model = CASE provider
+             WHEN 'codex' THEN '${initialModelFor("codex")}'
+             WHEN 'grok' THEN '${initialModelFor("grok")}'
+           END
+         WHERE model = 'default';
+        PRAGMA user_version = 2;
+        COMMIT;
+      `);
+    }
   }
 
   #ensureDefaultProfile(): void {

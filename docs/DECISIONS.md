@@ -2,6 +2,14 @@
 
 Each decision is **Active**, **Superseded**, or **Transitional**.
 
+## 2026-07-24 — Every CLI invocation pins a concrete model
+
+**Status: Active**
+
+The model selector contains only concrete model identifiers confirmed by the installed CLIs. The application neither displays nor accepts a generic `default` model and passes `--model` on every direct-answer, planning, and execution invocation.
+
+Codex initially selects `gpt-5.6-sol`; Grok initially selects its sole listed model, `grok-4.5`. SQLite schema version 2 replaces legacy `default` ledger values with these provider-specific identifiers. This makes stored job provenance stable across CLI default changes while keeping provider catalogs behind a versioned application contract.
+
 ## 2026-07-24 — Semantic variable-font stacks with resilient CDN loading
 
 **Status: Active**

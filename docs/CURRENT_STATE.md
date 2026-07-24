@@ -7,6 +7,7 @@ The WorkOS-native first vertical slice is implemented:
 - first-run and settings-based WorkOS root configuration;
 - exact Git-root and root `AGENTS.md` validation;
 - separate standing grants for Codex and Grok;
+- explicit, CLI-verified model selection with no generic model fallback;
 - one continuous conversation with provider segments;
 - one-call, read-only Codex and Grok answers with unmodified final text;
 - deterministic routing that defaults ambiguous requests to read-only;
@@ -45,7 +46,10 @@ Synthetic tests cover:
 - dirty-worktree denial;
 - idempotency and restart recovery;
 - responsive desktop, tablet, and phone flows;
-- provider switching within one timeline.
+- provider switching within one timeline;
+- rejection of missing, generic-default, and cross-provider model selections;
+- migration of legacy generic model rows to concrete provider models;
+- explicit model arguments in direct-answer, planning, and execution invocations.
 
 Live verification must use read-only questions against the owner’s configured WorkOS when it contains pre-existing changes. Repository tests never read personal WorkOS data.
 
