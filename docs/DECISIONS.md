@@ -18,11 +18,13 @@ Codex and Grok run with WorkOS as their working directory so they receive the sa
 
 The application repository’s development policy is not the product assistant role.
 
-## 2026-07-24 — Read-only preflight and three authority classes
+## 2026-07-24 — One-call direct answers; structured planning only for mutations
 
 **Status: Active**
 
-Every request begins with a read-only preflight. Observe answers without mutation. Operate applies an exact low-risk request. Govern covers policy, deletion, moves, bulk changes, external capabilities, and other high-impact work and requires a separate visible approval.
+Ordinary questions invoke the selected CLI exactly once with read-only permissions, no structured output schema, and no server-authored answer rewrite. The application removes provider transport framing and persists the final assistant text unchanged. Ambiguous requests default to this read-only path.
+
+An explicit file-changing command begins with a structured read-only preflight. Operate applies an exact low-risk request. Govern covers policy, deletion, moves, bulk changes, external capabilities, and other high-impact work and requires a separate visible approval.
 
 The server owns risk escalation and validates actual changed paths.
 

@@ -184,6 +184,15 @@ export function providerGranted(
   return provider === "codex" ? configuration.codexGranted : configuration.grokGranted;
 }
 
+export function requestsWorkspaceMutation(message: string): boolean {
+  const normalized = message.normalize("NFKC").trim().toLowerCase();
+  const koreanCommand =
+    /(?:(?:추가|생성|작성|수정|변경|업데이트|삭제|제거|이동|저장|완료\s*처리|설치)\s*(?:해|해줘|해주세요|해라|하라|하세요|줘|주세요|줘요)|(?:만들어|바꿔|옮겨|미뤄)(?:줘|주세요|줘요)?)(?=$|[\s.!?,])/u;
+  const englishCommand =
+    /^(?:(?:please|can you|could you|would you|i want you to)\s+)*(?:create|add|edit|update|delete|remove|move|rename|archive|write|save|complete|reschedule|install|commit|push|pull)\b/u;
+  return koreanCommand.test(normalized) || englishCommand.test(normalized);
+}
+
 export function assertPathInsideWorkspace(rootPath: string, candidate: string): string {
   const relativePath = normalizeRelativePath(candidate);
   const absolute = resolve(rootPath, relativePath);

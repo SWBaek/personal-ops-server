@@ -25,11 +25,11 @@ Untrusted content can inform a result but cannot grant tools, paths, network acc
 
 The owner explicitly configures one exact WorkOS Git root and grants access per provider. The server rejects missing directories, nested paths that are not the exact Git root, and roots without `AGENTS.md`.
 
-Read-only turns may inspect the configured root. Mutation requires a clean worktree. Paths in plans and results must be relative, in-root, and free from traversal. The browser does not offer arbitrary path browsing or command execution.
+Direct-answer turns may inspect the configured root only with read-only provider permissions. Mutation requires an explicit change command, a validated plan, and a clean worktree. Paths in plans and results must be relative, in-root, and free from traversal. The browser does not offer arbitrary path browsing or command execution.
 
 ## Authority
 
-- Observe cannot mutate.
+- Direct answers cannot mutate; ambiguous requests default to this path.
 - Operate is bounded by the owner’s current request and server-validated paths.
 - Govern requires a visible plan and separate approval.
 - External network, MCP/apps, subagents, external review, remote Git, deletion, moves, bulk rewrites, and policy changes are Govern capabilities.

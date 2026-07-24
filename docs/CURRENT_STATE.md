@@ -8,7 +8,9 @@ The WorkOS-native first vertical slice is implemented:
 - exact Git-root and root `AGENTS.md` validation;
 - separate standing grants for Codex and Grok;
 - one continuous conversation with provider segments;
-- provider-independent structured preflight plans;
+- one-call, read-only Codex and Grok answers with unmodified final text;
+- deterministic routing that defaults ambiguous requests to read-only;
+- provider-independent structured preflight plans for explicit mutations;
 - Observe, Operate, and Govern risk handling;
 - visible Govern approval and rejection;
 - direct provider execution in the configured WorkOS root;
@@ -31,7 +33,8 @@ Synthetic tests cover:
 
 - invalid roots and missing instructions;
 - plan risk escalation;
-- Codex and Grok invocation contracts;
+- Codex and Grok direct-answer and mutation invocation contracts;
+- raw final-answer preservation without structured result parsing;
 - read-only turns with no file changes;
 - low-risk change, local commit, receipt, diff, and Undo;
 - Govern approval;
@@ -55,4 +58,4 @@ Live verification must use read-only questions against the owner’s configured 
 
 ## Next real milestone
 
-Prove the provider contracts against representative real read-only WorkOS questions, then add the smallest approved mutation benchmark. Measure plan correctness, path containment, useful receipts, and recovery. Add a new capability only when those results identify a concrete limitation.
+Evaluate representative direct WorkOS questions across both providers, then add the smallest approved mutation benchmark. Measure answer usefulness, mutation routing, path containment, useful receipts, and recovery. Add a new capability only when those results identify a concrete limitation.

@@ -38,7 +38,7 @@ test("smartphone preserves the full chat workflow without horizontal overflow", 
   expect(metrics.height).toBeLessThanOrEqual(metrics.viewportHeight);
 });
 
-test("read-only planning answers and survives reload", async ({ page }) => {
+test("one-call read-only answer bypasses a plan and survives reload", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await page.locator("#message-input").fill("오늘 일정은?");
   await page.locator("#send-button").click();
@@ -46,6 +46,8 @@ test("read-only planning answers and survives reload", async ({ page }) => {
   await expect(userBubble).toContainText("오늘 일정은?");
   await expect(userBubble).not.toContainText("??");
   await expect(page.locator(".message.assistant").last()).toContainText("등록된 일정이 없습니다");
+  await expect(page.locator(".message.assistant").last().locator(".plan-card")).toHaveCount(0);
+  await expect(page.locator(".message.assistant").last()).toContainText("CLI 최종 답변을 그대로 전달");
   await expect(page.locator("#composer-status")).toHaveText("완료했습니다.");
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.locator("#messages")).toContainText("오늘 일정은?");

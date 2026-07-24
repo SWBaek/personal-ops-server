@@ -24,6 +24,13 @@ const vault = join(root, "synthetic-workos");
 createGitWorkspace(vault);
 
 const provider: WorkspaceProvider = {
+  async answer(input: WorkspaceProviderInput): Promise<string> {
+    await delay(80, input.signal);
+    if (input.message.includes("일정")) {
+      return "합성 WorkOS에는 오늘 등록된 일정이 없습니다.";
+    }
+    return "합성 WorkOS를 직접 읽고 답변했습니다.";
+  },
   async plan(input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
     await delay(80, input.signal);
     if (input.message.includes("일정")) {

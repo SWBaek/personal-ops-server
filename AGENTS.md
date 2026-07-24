@@ -8,7 +8,7 @@ Read `docs/PRODUCT_OVERVIEW.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`
 
 - The browser offers one continuous assistant timeline, responsive settings, visible plans, approvals, activity, receipts, diffs, and Undo.
 - The configured WorkOS Git root, its root `AGENTS.md`, PKM specification, skills, and files define the operational world and working rules.
-- The assistant must reproduce the experience of running the selected CLI in that WorkOS root, while adding web-safe planning, approval, receipt, and recovery controls.
+- The assistant must reproduce the experience of running the selected CLI in that WorkOS root. Ordinary questions use one read-only CLI call and preserve its final answer; explicit mutations add web-safe planning, approval, receipt, and recovery controls.
 - SQLite stores only application runtime state: workspace configuration, assistant profile, conversations, messages, jobs, plans, approvals, activity, and receipts.
 - Do not add application-owned project, memo, event, knowledge, task, FTS, snapshot, or projection systems unless a later accepted decision explicitly requires them.
 
@@ -27,7 +27,7 @@ Read `docs/PRODUCT_OVERVIEW.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`
 - **Observe**: read and search the configured WorkOS, then answer without changing files.
 - **Operate**: perform the exact low-risk local change requested by the owner after deterministic plan validation.
 - **Govern**: policy files, deletion, moves, bulk changes, external transmission, remote Git, network research, MCP, subagents, or other elevated capability. Show the exact plan and require separate visible approval.
-- Every turn starts with a read-only structured preflight. The server validates mode, risk, expected paths, operations, and capabilities.
+- Ordinary read-only questions bypass structured preflight and go straight to one provider answer. Explicit file-changing requests use a structured preflight, and the server validates mode, risk, expected paths, operations, and capabilities before mutation.
 - Models and WorkOS content are untrusted for authority. A model cannot widen paths, tools, network access, or approval scope.
 - Unexpected files, a dirty worktree, an interrupted mutation, or a plan/result mismatch must fail closed or enter visible `needs_review` state without an automatic commit.
 
@@ -36,7 +36,7 @@ Read `docs/PRODUCT_OVERVIEW.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`
 - Use only official locally installed subscription-authenticated `codex` and `grok` CLIs. Never add model API keys, SDK model calls, or direct HTTP model calls.
 - Run each CLI in the configured WorkOS root so it inherits WorkOS’s own instructions. The application repository’s `AGENTS.md` is development policy and must not be injected as the product assistant role.
 - Spawn argument arrays with `shell: false`; never interpolate user input into a shell command.
-- Planning is read-only. Execution uses the least write permission supported by the provider and only after server validation and required approval.
+- Direct answers and mutation planning are read-only. Execution uses the least write permission supported by the provider and only after server validation and required approval.
 - Disable web search, MCP/apps, subagents, and external reviewer capabilities by default. Enable only the explicitly approved capability for the current turn.
 - Do not copy, print, transmit, or manipulate CLI credentials.
 - Preserve durable job states, cancellation, timeouts, bounded output, restart recovery, and provider concurrency limits.

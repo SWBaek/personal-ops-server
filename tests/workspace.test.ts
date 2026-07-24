@@ -5,10 +5,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { buildInvocation, parseProviderJson } from "../src/ai/workspace-provider.js";
+import {
+  buildDirectInvocation,
+  buildInvocation,
+  parseDirectProviderText,
+  parseProviderJson,
+} from "../src/ai/workspace-provider.js";
 import {
   enforceWorkspaceRisk,
   parseWorkspacePlan,
+  requestsWorkspaceMutation,
   type WorkspaceTurnPlan,
 } from "../src/domain/workspace.js";
 import { GitWorkspace } from "../src/infra/git-workspace.js";
@@ -97,6 +103,58 @@ test("provider invocations discover WorkOS instructions and separate plan from w
   const execute = buildInvocation({ ...base, write: true, capabilities: ["local"] });
   assert.ok(execute.args.includes("workspace-write"));
   assert.ok(execute.args.includes("-C"));
+});
+
+test("direct provider invocations bypass structured planning and preserve the owner request", () => {
+  const base = {
+    provider: "codex" as const,
+    model: "default",
+    reasoningEffort: "high",
+    rootPath: "C:\\synthetic\\WorkOs",
+    message: "내 AI Task를 요약해줘",
+    profile: {} as never,
+    signal: new AbortController().signal,
+  };
+  const codex = buildDirectInvocation(base);
+  assert.equal(codex.stdin, base.message);
+  assert.ok(codex.args.includes("read-only"));
+  assert.ok(!codex.args.includes("--output-schema"));
+
+  const grok = buildDirectInvocation({ ...base, provider: "grok" });
+  assert.ok(grok.args.includes("--no-plan"));
+  assert.ok(grok.args.includes("--verbatim"));
+  assert.ok(!grok.args.includes("--json-schema"));
+  assert.equal(grok.args.at(-1), base.message);
+});
+
+test("direct provider parsers return final answer text without schema rewriting", () => {
+  const grokAnswer = "직접 답변입니다.\n\n- 첫 번째";
+  assert.equal(
+    parseDirectProviderText("grok", JSON.stringify({ text: grokAnswer })),
+    grokAnswer,
+  );
+  const codexAnswer = "Codex의 **최종 답변**";
+  assert.equal(
+    parseDirectProviderText("codex", [
+      JSON.stringify({ type: "item.completed", item: { type: "reasoning", text: "hidden" } }),
+      JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: codexAnswer } }),
+    ].join("\n")),
+    codexAnswer,
+  );
+  assert.throws(
+    () => parseDirectProviderText("grok", "not JSON"),
+    /AI provider returned no usable answer/u,
+  );
+});
+
+test("only explicit change commands enter the mutation workflow", () => {
+  assert.equal(requestsWorkspaceMutation("내 AI Task에 관해 요약해줘"), false);
+  assert.equal(requestsWorkspaceMutation("수정된 파일을 보여줘"), false);
+  assert.equal(requestsWorkspaceMutation("What did I update yesterday?"), false);
+  assert.equal(requestsWorkspaceMutation("README를 업데이트해"), true);
+  assert.equal(requestsWorkspaceMutation("이 노트를 삭제해주세요."), true);
+  assert.equal(requestsWorkspaceMutation("Create a project note"), true);
+  assert.equal(requestsWorkspaceMutation("Could you update README.md?"), true);
 });
 
 test("Grok parser accepts one structured object with provider framing or trailing prose", () => {

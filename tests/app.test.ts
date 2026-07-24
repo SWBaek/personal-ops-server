@@ -17,6 +17,10 @@ import { OpsStore } from "../src/infra/store.js";
 import { createGitWorkspace } from "./helpers.js";
 
 class NoopProvider implements WorkspaceProvider {
+  async answer(_input: WorkspaceProviderInput): Promise<string> {
+    return "Synthetic answer";
+  }
+
   async plan(_input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
     return {
       mode: "observe",
@@ -80,7 +84,7 @@ test("first-run configuration validates Git and exposes only WorkOS-native APIs"
   }
 });
 
-test("conversation request completes through read-only planning", async () => {
+test("conversation question completes through one direct provider answer", async () => {
   const temporary = mkdtempSync(join(tmpdir(), "ops-app-"));
   const vault = join(temporary, "vault");
   createGitWorkspace(vault);

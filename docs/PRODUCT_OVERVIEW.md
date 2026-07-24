@@ -10,10 +10,10 @@ WorkOS is required and remains the only source of truth for projects, schedule, 
 
 The owner can ask a question or request a change in one conversation and expect the system to:
 
-1. run a read-only preflight in the configured WorkOS root;
+1. run an ordinary question as one read-only CLI invocation in the configured WorkOS root;
 2. follow WorkOS’s own `AGENTS.md`, PKM specification, and skills;
-3. show the plan, expected paths, operations, capabilities, and risk;
-4. answer read-only questions without changing files;
+3. preserve the CLI’s final answer instead of asking it for a structured plan first;
+4. detect explicit file-changing commands and show their plan, expected paths, operations, capabilities, and risk;
 5. execute an approved bounded change only when the worktree is clean;
 6. validate actual changed paths;
 7. create one local Git commit and a human-readable receipt;

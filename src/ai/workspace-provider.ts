@@ -29,6 +29,7 @@ export interface WorkspaceExecutionInput extends WorkspaceProviderInput {
 }
 
 export interface WorkspaceProvider {
+  answer(input: WorkspaceProviderInput): Promise<string>;
   plan(input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan>;
   execute(input: WorkspaceExecutionInput): Promise<WorkspaceExecutionResult>;
 }
@@ -54,6 +55,12 @@ export class CliWorkspaceProvider implements WorkspaceProvider {
       encoding: "utf8",
       mode: 0o600,
     });
+  }
+
+  async answer(input: WorkspaceProviderInput): Promise<string> {
+    const invocation = buildDirectInvocation(input);
+    const output = await runInvocation(invocation, input.rootPath, input.signal);
+    return parseDirectProviderText(input.provider, output);
   }
 
   async plan(input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
@@ -83,6 +90,56 @@ export class CliWorkspaceProvider implements WorkspaceProvider {
     const output = await runInvocation(invocation, input.rootPath, input.signal);
     return parseWorkspaceExecution(parseProviderJson(input.provider, output));
   }
+}
+
+export function buildDirectInvocation(input: WorkspaceProviderInput): Invocation {
+  if (input.provider === "codex") {
+    const args = [
+      "exec",
+      "--json",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "-C",
+      input.rootPath,
+      "-c",
+      'web_search="disabled"',
+      "-c",
+      "mcp_servers={}",
+      "--disable",
+      "apps",
+      "--disable",
+      "multi_agent",
+    ];
+    if (input.model !== "default") args.push("--model", input.model);
+    if (input.reasoningEffort !== "default") {
+      args.push("-c", `model_reasoning_effort="${input.reasoningEffort}"`);
+    }
+    args.push("-");
+    return { command: "codex", args, stdin: input.message };
+  }
+
+  const args = [
+    "--no-auto-update",
+    "--output-format",
+    "json",
+    "--cwd",
+    input.rootPath,
+    "--max-turns",
+    "20",
+    "--permission-mode",
+    "plan",
+    "--no-plan",
+    "--disable-web-search",
+    "--no-memory",
+    "--no-subagents",
+  ];
+  if (input.model !== "default") args.push("--model", input.model);
+  if (input.reasoningEffort !== "default") {
+    args.push("--reasoning-effort", input.reasoningEffort);
+  }
+  args.push("--verbatim", "--single", input.message);
+  return { command: "grok", args, stdin: null };
 }
 
 export function buildInvocation(input: WorkspaceProviderInput & {
@@ -138,6 +195,36 @@ export function buildInvocation(input: WorkspaceProviderInput & {
   }
   args.push("--single", input.prompt);
   return { command: "grok", args, stdin: null };
+}
+
+export function parseDirectProviderText(provider: AiProviderId, output: string): string {
+  try {
+    if (provider === "grok") {
+      const result = JSON.parse(output) as unknown;
+      if (isRecord(result) && typeof result.text === "string" && result.text.trim()) {
+        return result.text;
+      }
+      throw new Error("missing Grok response text");
+    }
+    let finalText: string | null = null;
+    for (const line of output.split(/\r?\n/u)) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as unknown;
+      if (
+        isRecord(event)
+        && event.type === "item.completed"
+        && isRecord(event.item)
+        && event.item.type === "agent_message"
+        && typeof event.item.text === "string"
+      ) {
+        finalText = event.item.text;
+      }
+    }
+    if (!finalText?.trim()) throw new Error("missing Codex response text");
+    return finalText;
+  } catch {
+    throw new AiChatError("AI provider returned no usable answer", 502);
+  }
 }
 
 function buildPlanningPrompt(profile: AssistantProfile, message: string): string {

@@ -19,12 +19,16 @@ import { OpsStore } from "../src/infra/store.js";
 import { createGitWorkspace, git } from "./helpers.js";
 
 class FakeProvider implements WorkspaceProvider {
+  answerResult: string;
   planResult: WorkspaceTurnPlan;
   executionResult: WorkspaceExecutionResult;
   writePath: string | null;
   writeContent: string;
+  answerCalls = 0;
+  planCalls = 0;
 
-  constructor(plan: WorkspaceTurnPlan, writePath: string | null = null) {
+  constructor(plan: WorkspaceTurnPlan, writePath: string | null = null, answer = "오늘 일정입니다.") {
+    this.answerResult = answer;
     this.planResult = plan;
     this.writePath = writePath;
     this.writeContent = "# Updated by assistant\n";
@@ -36,7 +40,13 @@ class FakeProvider implements WorkspaceProvider {
     };
   }
 
+  async answer(_input: WorkspaceProviderInput): Promise<string> {
+    this.answerCalls += 1;
+    return this.answerResult;
+  }
+
   async plan(_input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
+    this.planCalls += 1;
     return this.planResult;
   }
 
@@ -49,11 +59,21 @@ class FakeProvider implements WorkspaceProvider {
 test("observe completes without writes and execute creates one receipt commit with Undo", async () => {
   const fixture = setupFixture();
   try {
-    const observeProvider = new FakeProvider(plan({ mode: "observe", reply: "오늘 일정입니다." }));
+    const directAnswer = "오늘 일정입니다.\n\n- 14:00 프로젝트 미팅";
+    const observeProvider = new FakeProvider(
+      plan({ mode: "observe", reply: "이 계획은 사용되지 않아야 합니다." }),
+      null,
+      directAnswer,
+    );
     const observeService = new AiConversationService(fixture.store, observeProvider, fixture.workspace);
     const observeJob = createTurn(fixture.store, fixture.conversationId, "오늘 일정은?");
     observeService.enqueue(observeJob);
     await waitFor(() => fixture.store.getAiJob(observeJob)?.status === "succeeded");
+    const observe = fixture.store.getAiJob(observeJob)!;
+    assert.equal(fixture.store.getAiMessage(observe.assistantMessageId)!.content, directAnswer);
+    assert.equal(observe.plan, null);
+    assert.equal(observeProvider.answerCalls, 1);
+    assert.equal(observeProvider.planCalls, 0);
     assert.equal(fixture.workspace.changedPaths(fixture.vault).length, 0);
     await observeService.close();
 
@@ -66,6 +86,8 @@ test("observe completes without writes and execute creates one receipt commit wi
     const executeJob = createTurn(fixture.store, fixture.conversationId, "README를 업데이트해");
     executeService.enqueue(executeJob);
     await waitFor(() => fixture.store.getAiJob(executeJob)?.status === "succeeded");
+    assert.equal(executeProvider.answerCalls, 0);
+    assert.equal(executeProvider.planCalls, 1);
     const receipts = fixture.store.listReceipts();
     assert.equal(receipts.length, 1);
     assert.equal(git(fixture.vault, ["status", "--porcelain"]), "");
