@@ -2,6 +2,14 @@
 
 Each decision is **Active**, **Superseded**, or **Transitional**.
 
+## 2026-07-24 — Grok completion permits only compatible trailing envelopes
+
+**Status: Active**
+
+GitHub Issue: #29.
+
+Grok direct answers still require `end` with `stopReason: EndTurn`. After that event, the adapter may accept a `result` envelope only when any included answer exactly matches the already completed final segment, plus a content-free `usage` envelope. Later text, thought, tool, mismatched result, or unknown events remain failures. This preserves terminal integrity across CLI envelope changes without storing or exposing provider traces.
+
 ## 2026-07-24 — Owner-visible tool traces are permitted on the private tailnet
 
 **Status: Superseded by AI liveness signal policy below**

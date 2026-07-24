@@ -227,7 +227,13 @@ export function parseDirectProviderText(provider: AiProviderId, output: string):
         if (!isRecord(event) || typeof event.type !== "string") {
           throw new Error("invalid Grok stream event");
         }
-        if (completed) throw new Error("Grok emitted output after completion");
+        if (completed) {
+          const finalText = segments.at(-1);
+          if (!finalText || !isCompatibleGrokTerminalEnvelope(event, finalText)) {
+            throw new Error("Grok emitted output after completion");
+          }
+          continue;
+        }
         if (event.type === "text") {
           if (typeof event.data !== "string") throw new Error("invalid Grok text event");
           current += event.data;
@@ -274,6 +280,20 @@ export function parseDirectProviderText(provider: AiProviderId, output: string):
   } catch {
     throw new AiChatError("AI provider returned no usable answer", 502);
   }
+}
+
+function isCompatibleGrokTerminalEnvelope(
+  event: Record<string, unknown>,
+  finalText: string,
+): boolean {
+  if (event.type === "usage") {
+    return event.data === undefined && event.text === undefined && event.result === undefined;
+  }
+  if (event.type !== "result") return false;
+  for (const value of [event.data, event.text, event.result]) {
+    if (value !== undefined && value !== finalText) return false;
+  }
+  return true;
 }
 
 function buildPlanningPrompt(profile: AssistantProfile, message: string): string {

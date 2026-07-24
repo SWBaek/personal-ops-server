@@ -210,6 +210,36 @@ test("direct provider parsers ignore progress messages and require terminal comp
   );
 });
 
+test("Grok parser accepts matching post-terminal envelopes and rejects later content", () => {
+  const answer = "최종 답변";
+  const base = [
+    JSON.stringify({ type: "text", data: answer }),
+    JSON.stringify({ type: "end", stopReason: "EndTurn", num_turns: 2 }),
+  ];
+  assert.equal(
+    parseDirectProviderText("grok", [
+      ...base,
+      JSON.stringify({ type: "result", result: answer, duration_ms: 1200 }),
+      JSON.stringify({ type: "usage", usage: { input_tokens: 10 } }),
+    ].join("\n")),
+    answer,
+  );
+  assert.throws(
+    () => parseDirectProviderText("grok", [
+      ...base,
+      JSON.stringify({ type: "result", result: "different answer" }),
+    ].join("\n")),
+    /AI provider returned no usable answer/u,
+  );
+  assert.throws(
+    () => parseDirectProviderText("grok", [
+      ...base,
+      JSON.stringify({ type: "text", data: "late content" }),
+    ].join("\n")),
+    /AI provider returned no usable answer/u,
+  );
+});
+
 test("only explicit change commands enter the mutation workflow", () => {
   assert.equal(requestsWorkspaceMutation("내 AI Task에 관해 요약해줘"), false);
   assert.equal(requestsWorkspaceMutation("수정된 파일을 보여줘"), false);
