@@ -56,6 +56,12 @@ Both providers implement the same direct-answer, plan, and execution interfaces.
 
 Web search, MCP/apps, subagents, external review, and remote Git are disabled by default. A later workflow may add a narrowly scoped capability only behind Govern approval.
 
+## Message presentation
+
+Provider Markdown is preserved unchanged in SQLite and API responses. The browser parses assistant messages as GitHub-flavored Markdown, sanitizes the generated HTML against an explicit element and attribute allowlist, and then adds safe external-link attributes. Owner messages use text nodes only.
+
+Markdown tables and code blocks own their horizontal scrolling so the application page remains contained on desktop, tablet, and phone.
+
 ## Git boundary
 
 The application requires local Git for transaction safety. It does not require or operate a remote. It stages only validated changed paths, creates one receipt commit, and can revert only the latest receipt when HEAD and worktree preconditions still match.

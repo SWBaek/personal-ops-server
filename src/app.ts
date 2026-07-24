@@ -1,6 +1,8 @@
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance } from "fastify";
+import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   AI_PROVIDER_OPTIONS,
@@ -27,12 +29,27 @@ interface BuildAppOptions {
   environment?: "development" | "production" | "test";
 }
 
+const MARKED_BROWSER_MODULE = fileURLToPath(import.meta.resolve("marked"));
+const DOMPURIFY_BROWSER_MODULE = fileURLToPath(import.meta.resolve("dompurify"));
+
 export async function buildApp(options: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
   await app.register(fastifyStatic, {
     root: options.publicDir ?? resolve("public"),
     prefix: "/",
   });
+
+  app.get("/vendor/marked.js", async (_request, reply) =>
+    reply
+      .type("text/javascript; charset=utf-8")
+      .header("cache-control", "public, max-age=86400")
+      .send(createReadStream(MARKED_BROWSER_MODULE)));
+
+  app.get("/vendor/dompurify.js", async (_request, reply) =>
+    reply
+      .type("text/javascript; charset=utf-8")
+      .header("cache-control", "public, max-age=86400")
+      .send(createReadStream(DOMPURIFY_BROWSER_MODULE)));
 
   app.get("/api/health", async () => ({
     ok: true,

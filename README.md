@@ -4,6 +4,8 @@ A private responsive web workspace for using the official `codex` and `grok` CLI
 
 WorkOS remains the single source of truth. Ordinary questions use one read-only CLI call and preserve the CLI’s final answer without a structured planning pass. Explicit file-changing requests add risk-based planning and approval, durable job state, local Git receipts, diffs, and latest-receipt Undo. The application does not duplicate projects, schedules, tasks, or knowledge in SQLite.
 
+Provider answers remain stored as original Markdown. The browser renders assistant messages through a sanitized Markdown presentation layer; owner messages remain plain text.
+
 WorkOS is primarily synchronized by Obsidian Sync. Remote Git upload and push are optional and are never required or performed automatically. Local Git exists only to provide transactional receipts and Undo for assistant changes.
 
 ## Requirements

@@ -2,6 +2,14 @@
 
 Each decision is **Active**, **Superseded**, or **Transitional**.
 
+## 2026-07-24 — Preserve Markdown evidence; sanitize only at presentation
+
+**Status: Active**
+
+The application stores and transports the provider’s original Markdown unchanged. Assistant messages are parsed and sanitized only in the browser presentation layer. Generated HTML is not canonical state and is not persisted.
+
+The renderer uses an explicit HTML element and attribute allowlist. Images, scripts, event attributes, embedded content, styles, and unsafe link protocols are excluded. Owner messages remain plain text. Tables and code blocks scroll within the message rather than widening the application page.
+
 ## 2026-07-24 — WorkOS is the required canonical system
 
 **Status: Active**
