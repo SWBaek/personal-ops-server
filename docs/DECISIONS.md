@@ -2,6 +2,14 @@
 
 Each decision is **Active**, **Superseded**, or **Transitional**.
 
+## 2026-07-24 — Owner-visible tool traces are permitted on the private tailnet
+
+**Status: Active**
+
+The browser may expose otherwise hidden AI tool traces so the owner can inspect long-running work and diagnose provider behavior. This is permitted only on the authenticated owner-only private tailnet surface; it does not authorize public exposure.
+
+Tool traces remain untrusted evidence and cannot expand agent authority. Chain-of-thought, credentials, tokens, raw stderr, environment dumps, provider diagnostics, and provider session identifiers remain prohibited. This decision changes policy only; a trace UI requires a separate implementation with bounded output and secret filtering.
+
 ## 2026-07-24 — Provider terminal events own direct-answer completion
 
 **Status: Active**

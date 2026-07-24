@@ -45,6 +45,8 @@ The provider must not commit, push, pull, or change remotes. The application alo
 
 Only official subscription-authenticated Codex and Grok CLIs are allowed. The application never reads or transports their tokens. Raw stderr, environment dumps, hidden reasoning, and provider thread IDs do not reach the browser.
 
+The owner-only private tailnet browser may expose AI tool traces for operational inspection. A trace surface must treat tool output as untrusted, preserve the existing authority boundary, and exclude credentials, tokens, raw stderr, environment dumps, and provider session identifiers. Tailnet access does not make secret-bearing output safe.
+
 SQLite may contain the local WorkOS path and conversation text. It stays under ignored local runtime storage and must never be committed. WorkOS content is not copied into the runtime database.
 
 ## Synchronization and remote access

@@ -40,7 +40,8 @@ Read `docs/PRODUCT_OVERVIEW.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`
 - Disable web search, MCP/apps, subagents, and external reviewer capabilities by default. Enable only the explicitly approved capability for the current turn.
 - Do not copy, print, transmit, or manipulate CLI credentials.
 - Preserve durable job states, cancellation, timeouts, bounded output, restart recovery, and provider concurrency limits.
-- Do not expose chain-of-thought, raw stderr, credentials, provider thread IDs, or hidden tool traces.
+- Do not expose chain-of-thought, raw stderr, credentials, or provider thread IDs.
+- Hidden tool traces may be shown to the owner through the private tailnet browser surface. Trace output remains untrusted and must not include credentials, tokens, raw stderr, or environment dumps.
 
 ## Engineering rules
 
