@@ -243,8 +243,15 @@ export function parseProviderJson(provider: AiProviderId, output: string): unkno
   try {
     if (provider === "grok") {
       const result = JSON.parse(output) as unknown;
-      if (isRecord(result) && typeof result.text === "string") {
-        return parseFirstJsonObject(result.text);
+      if (isRecord(result)) {
+        if (result.structuredOutput !== undefined && result.structuredOutput !== null) {
+          return typeof result.structuredOutput === "string"
+            ? parseFirstJsonObject(result.structuredOutput)
+            : result.structuredOutput;
+        }
+        if (typeof result.text === "string") {
+          return parseFirstJsonObject(result.text);
+        }
       }
       return result;
     }

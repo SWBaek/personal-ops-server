@@ -102,6 +102,20 @@ test("provider invocations discover WorkOS instructions and separate plan from w
 test("Grok parser accepts one structured object with provider framing or trailing prose", () => {
   assert.deepEqual(
     parseProviderJson("grok", JSON.stringify({
+      text: "This text is intentionally not JSON.",
+      structuredOutput: { answer: "verified" },
+    })),
+    { answer: "verified" },
+  );
+  assert.deepEqual(
+    parseProviderJson("grok", JSON.stringify({
+      text: "ignored",
+      structuredOutput: "{\"answer\":\"string representation\"}",
+    })),
+    { answer: "string representation" },
+  );
+  assert.deepEqual(
+    parseProviderJson("grok", JSON.stringify({
       text: "```json\n{\"answer\":\"brace } inside a string\"}\n```",
     })),
     { answer: "brace } inside a string" },
