@@ -62,6 +62,8 @@ Provider Markdown is preserved unchanged in SQLite and API responses. The browse
 
 Markdown tables and code blocks own their horizontal scrolling so the application page remains contained on desktop, tablet, and phone.
 
+Typography is semantic rather than component-specific: Pretendard Variable is the UI, heading, prose, and table family; JetBrains Mono Variable is limited to code, logs, paths, commands, diffs, and identifiers. Version-pinned CDN stylesheets use system-font fallbacks and are not required for application startup or operation.
+
 ## Git boundary
 
 The application requires local Git for transaction safety. It does not require or operate a remote. It stages only validated changed paths, creates one receipt commit, and can revert only the latest receipt when HEAD and worktree preconditions still match.

@@ -74,6 +74,20 @@ test("assistant Markdown is readable, sanitized, and contained on every viewport
   await expect(markdown.locator("script, img, [onerror], [onclick]")).toHaveCount(0);
   await expect(markdown.getByText("위험한 링크")).not.toHaveAttribute("href", /javascript/u);
   expect(await page.evaluate("window.__markdownXss")).toBeUndefined();
+  const typography = await page.evaluate<{
+    ui: string;
+    heading: string;
+    table: string;
+    code: string;
+    path: string;
+  }>(
+    "(() => ({ ui: getComputedStyle(document.documentElement).fontFamily, heading: getComputedStyle(document.querySelector('.markdown-body h2')).fontFamily, table: getComputedStyle(document.querySelector('.markdown-body table')).fontFamily, code: getComputedStyle(document.querySelector('.markdown-body code')).fontFamily, path: getComputedStyle(document.querySelector('.workspace-card .mono-text')).fontFamily }))()",
+  );
+  expect(typography.ui).toContain("Pretendard Variable");
+  expect(typography.heading).toContain("Pretendard Variable");
+  expect(typography.table).toContain("Pretendard Variable");
+  expect(typography.code).toContain("JetBrains Mono Variable");
+  expect(typography.path).toContain("JetBrains Mono Variable");
 
   for (const viewport of [
     { width: 1440, height: 720 },
@@ -96,6 +110,18 @@ test("assistant Markdown is readable, sanitized, and contained on every viewport
 
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.locator(".message.assistant").last().locator("h2")).toHaveText("프로젝트 요약");
+});
+
+test("CDN font failure keeps the application usable through local fallbacks", async ({ page }) => {
+  await page.route("https://cdn.jsdelivr.net/**", (route) => route.abort());
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(page.locator("#message-input")).toBeVisible();
+  await expect(page.locator("#send-button")).toBeEnabled();
+  const metrics = await page.evaluate<{ pageWidth: number; viewportWidth: number }>(
+    "({ pageWidth: document.documentElement.scrollWidth, viewportWidth: window.innerWidth })",
+  );
+  expect(metrics.pageWidth).toBeLessThanOrEqual(metrics.viewportWidth);
 });
 
 test("low-risk edit creates a receipt, diff, and latest-receipt Undo", async ({ page }) => {

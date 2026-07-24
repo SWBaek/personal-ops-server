@@ -6,6 +6,8 @@ WorkOS remains the single source of truth. Ordinary questions use one read-only 
 
 Provider answers remain stored as original Markdown. The browser renders assistant messages through a sanitized Markdown presentation layer; owner messages remain plain text.
 
+The interface uses CDN-loaded Pretendard Variable for UI and prose, and JetBrains Mono Variable for code, logs, paths, commands, diffs, and identifiers. Both stacks include local system fallbacks so a font CDN outage does not block the application.
+
 WorkOS is primarily synchronized by Obsidian Sync. Remote Git upload and push are optional and are never required or performed automatically. Local Git exists only to provide transactional receipts and Undo for assistant changes.
 
 ## Requirements

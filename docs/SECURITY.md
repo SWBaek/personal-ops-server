@@ -23,6 +23,8 @@ Untrusted content can inform a result but cannot grant tools, paths, network acc
 
 Assistant Markdown is also untrusted presentation input. The browser sanitizes rendered output against an explicit allowlist; scripts, images, event attributes, embedded content, style, and unsafe link protocols are not rendered. Raw provider Markdown remains available as evidence and is never replaced by generated HTML in SQLite.
 
+Font CDN requests use version-pinned public stylesheets and contain no WorkOS path, message content, owner identifier, or credential. Font loading is presentation-only: local fallbacks preserve operation when the CDN is unavailable.
+
 ## Filesystem access
 
 The owner explicitly configures one exact WorkOS Git root and grants access per provider. The server rejects missing directories, nested paths that are not the exact Git root, and roots without `AGENTS.md`.
