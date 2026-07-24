@@ -46,7 +46,7 @@ grok models
 
 Direct answers run in the WorkOS root with planning behavior disabled, streaming JSON framing, no memory, disabled web search, and no subagents. Headless `dontAsk` permission explicitly allows `Read`, `Grep`, and shell commands while denying `Edit`; the `read-only` sandbox is a second filesystem boundary. This lets an agent complete multi-step local inspection without granting a mutation.
 
-The adapter treats text before another thought or tool step as an intermediate progress segment. It waits for the terminal `end` event with `stopReason: EndTurn`, returns only the final text segment unchanged, and rejects missing completion, max-turn exhaustion, malformed events, or output after completion.
+The adapter treats text before another thought or tool step as an intermediate progress segment. It waits for a terminal `end` event and returns only the final non-empty text segment unchanged. `EndTurn` is the normal terminal reason. Grok 0.2.111 may instead exit zero with `Cancelled` after emitting a complete final segment; this is accepted because owner cancellation aborts and kills the process before parsing. A matching `result` envelope and content-free `usage` metadata may follow completion; later text, thought, tool, mismatched result, unknown output, missing text, max-turn exhaustion, and malformed events fail the job.
 
 Mutation planning runs in the WorkOS root with plan permission mode and a structured output schema.
 

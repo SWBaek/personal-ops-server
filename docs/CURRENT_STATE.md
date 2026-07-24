@@ -54,6 +54,8 @@ Synthetic tests cover:
 - explicit model arguments in direct-answer, planning, and execution invocations;
 - Grok multi-turn read-only tool use and final-answer extraction from streaming events;
 - rejection of unterminated progress-only, max-turn, and missing-completion provider output.
+- compatibility with matching Grok post-terminal result/usage envelopes while rejecting later content;
+- preservation of complete Grok answers that exit zero with the CLI's `Cancelled` terminal reason;
 - split UTF-8/JSONL progress parsing without provider body, tool argument, path, or stderr disclosure;
 
 Live verification must use read-only questions against the owner’s configured WorkOS when it contains pre-existing changes. Repository tests never read personal WorkOS data.
