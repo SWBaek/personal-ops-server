@@ -38,6 +38,7 @@ export interface AiConversation {
   defaultModel: string;
   defaultReasoningEffort: string;
   providerSegment: number;
+  viewHiddenThroughMessageId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -306,14 +307,15 @@ export class OpsStore {
       defaultModel: input.model,
       defaultReasoningEffort: input.reasoningEffort,
       providerSegment: 1,
+      viewHiddenThroughMessageId: null,
       createdAt: timestamp,
       updatedAt: timestamp,
     };
     this.#db.prepare(
       `INSERT INTO ai_conversations
         (id, provider, title, default_model, default_reasoning_effort,
-         provider_segment, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         provider_segment, view_hidden_through_message_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
     ).run(
       conversation.id,
       conversation.provider,
@@ -330,7 +332,7 @@ export class OpsStore {
   listAiConversations(): AiConversation[] {
     const rows = this.#db.prepare(
       `SELECT id, provider, title, default_model, default_reasoning_effort,
-              provider_segment, created_at, updated_at
+              provider_segment, view_hidden_through_message_id, created_at, updated_at
        FROM ai_conversations ORDER BY created_at`,
     ).all() as unknown as AiConversationRow[];
     return rows.map(mapConversation);
@@ -339,7 +341,7 @@ export class OpsStore {
   getAiConversation(id: string): AiConversation | null {
     const row = this.#db.prepare(
       `SELECT id, provider, title, default_model, default_reasoning_effort,
-              provider_segment, created_at, updated_at
+              provider_segment, view_hidden_through_message_id, created_at, updated_at
        FROM ai_conversations WHERE id = ?`,
     ).get(id) as AiConversationRow | undefined;
     return row ? mapConversation(row) : null;
@@ -372,6 +374,30 @@ export class OpsStore {
        FROM ai_messages WHERE conversation_id = ? ORDER BY created_at, rowid`,
     ).all(conversationId) as unknown as AiMessageRow[];
     return rows.map(mapMessage);
+  }
+
+  hideConversationHistory(id: string): AiConversation {
+    const conversation = this.getAiConversation(id);
+    if (!conversation) throw new Error("AI conversation not found");
+    if (this.hasActiveAiJobs()) throw new Error("AI conversation has an active request");
+    const latest = this.#db.prepare(
+      `SELECT id FROM ai_messages
+       WHERE conversation_id = ? AND status != 'pending'
+       ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+    ).get(id) as { id: string } | undefined;
+    if (!latest) return conversation;
+    this.#db.prepare(
+      "UPDATE ai_conversations SET view_hidden_through_message_id = ?, updated_at = ? WHERE id = ?",
+    ).run(latest.id, now(), id);
+    return this.getAiConversation(id)!;
+  }
+
+  restoreConversationHistory(id: string): AiConversation {
+    if (!this.getAiConversation(id)) throw new Error("AI conversation not found");
+    this.#db.prepare(
+      "UPDATE ai_conversations SET view_hidden_through_message_id = NULL, updated_at = ? WHERE id = ?",
+    ).run(now(), id);
+    return this.getAiConversation(id)!;
   }
 
   getAiMessage(id: string): AiMessage | null {
@@ -717,6 +743,7 @@ export class OpsStore {
         default_model TEXT NOT NULL,
         default_reasoning_effort TEXT NOT NULL,
         provider_segment INTEGER NOT NULL,
+        view_hidden_through_message_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -779,7 +806,7 @@ export class OpsStore {
         ON ai_messages (conversation_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_ai_jobs_status
         ON ai_jobs (status, created_at);
-      PRAGMA user_version = 3;
+      PRAGMA user_version = 4;
       COMMIT;
     `);
     }
@@ -836,6 +863,19 @@ export class OpsStore {
         this.#db.exec("ROLLBACK");
         throw error;
       }
+    }
+    const viewVersion = Number(
+      (this.#db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
+    );
+    if (viewVersion < 4) {
+      const columns = new Set(
+        (this.#db.prepare("PRAGMA table_info(ai_conversations)").all() as unknown as Array<{ name: string }>)
+          .map((column) => column.name),
+      );
+      if (!columns.has("view_hidden_through_message_id")) {
+        this.#db.exec("ALTER TABLE ai_conversations ADD COLUMN view_hidden_through_message_id TEXT");
+      }
+      this.#db.exec("PRAGMA user_version = 4");
     }
   }
 
@@ -978,6 +1018,7 @@ function mapConversation(row: AiConversationRow): AiConversation {
     defaultModel: row.default_model,
     defaultReasoningEffort: row.default_reasoning_effort,
     providerSegment: row.provider_segment,
+    viewHiddenThroughMessageId: row.view_hidden_through_message_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -1080,6 +1121,7 @@ interface AiConversationRow {
   default_model: string;
   default_reasoning_effort: string;
   provider_segment: number;
+  view_hidden_through_message_id: string | null;
   created_at: string;
   updated_at: string;
 }

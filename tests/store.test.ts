@@ -54,6 +54,7 @@ test("stores configuration, one conversation, idempotent turns, and provider seg
     });
     assert.equal(duplicate.duplicate, true);
     assert.equal(duplicate.job.id, first.job.id);
+    assert.throws(() => store.hideConversationHistory(conversation.id), /active request/u);
     const signalAt = new Date().toISOString();
     store.updateProviderProgress(first.job.id, {
       providerStartedAt: signalAt,
@@ -63,6 +64,10 @@ test("stores configuration, one conversation, idempotent turns, and provider seg
     assert.equal(store.getAiJob(first.job.id)!.currentPhase, "checking_workos");
     assert.equal(store.listActivity(first.job.id).length, 0);
     store.transitionJob(first.job.id, "succeeded", { content: "답변", error: null });
+    const hidden = store.hideConversationHistory(conversation.id);
+    assert.ok(hidden.viewHiddenThroughMessageId);
+    assert.equal(store.listAiMessages(conversation.id).length, 2);
+    assert.equal(store.restoreConversationHistory(conversation.id).viewHiddenThroughMessageId, null);
 
     const switched = store.switchConversationProvider(conversation.id, {
       provider: "grok",
@@ -108,7 +113,7 @@ test("migrates legacy default model rows to explicit provider models", () => {
     const inspected = new DatabaseSync(databasePath);
     assert.equal(
       (inspected.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
-      3,
+      4,
     );
     inspected.close();
   } finally {

@@ -2,6 +2,14 @@
 
 Each decision is **Active**, **Superseded**, or **Transitional**.
 
+## 2026-07-24 — Long chat cleanup hides presentation only
+
+**Status: Active**
+
+GitHub Issue: #31.
+
+The owner may hide all completed messages currently in the timeline without deleting runtime evidence. A nullable cutoff message identifier controls browser visibility, while messages, jobs, approvals, activity, receipts, and WorkOS remain unchanged. Active work blocks a new cutoff, newly created messages remain visible, and restore clears the cutoff.
+
 ## 2026-07-24 — Grok completion permits only compatible trailing envelopes
 
 **Status: Active**

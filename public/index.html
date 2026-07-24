@@ -33,6 +33,7 @@
             <h1 id="assistant-title">WorkOS 비서</h1>
           </div>
           <div class="topbar-actions">
+            <button id="timeline-hide" class="secondary-button timeline-button" type="button">이전 대화 숨기기</button>
             <span id="git-badge" class="status-badge">Workspace 확인 중</span>
             <button id="mobile-context" class="icon-button" type="button" aria-label="작업공간 상태">◎</button>
             <button id="mobile-settings" class="avatar-button" type="button" aria-label="설정 열기">설정</button>
@@ -52,6 +53,10 @@
                 <div><small>RECEIPT</small><strong>Git commit과 Undo</strong></div>
               </div>
             </article>
+            <div id="hidden-history" class="hidden-history" hidden>
+              <span id="hidden-history-count"></span>
+              <button id="timeline-restore" type="button">다시 보기</button>
+            </div>
             <div id="messages" class="messages"></div>
           </div>
         </section>

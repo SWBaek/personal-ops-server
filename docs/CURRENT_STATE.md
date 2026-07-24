@@ -9,6 +9,7 @@ The WorkOS-native first vertical slice is implemented:
 - separate standing grants for Codex and Grok;
 - explicit, CLI-verified model selection with no generic model fallback;
 - one continuous conversation with provider segments;
+- reversible historical-message view hiding with reload persistence and restore;
 - one-call, read-only Codex and Grok answers with unmodified final text;
 - terminal completion validation and final-segment extraction for multi-step provider responses;
 - deterministic routing that defaults ambiguous requests to read-only;
