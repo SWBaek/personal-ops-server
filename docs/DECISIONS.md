@@ -2,6 +2,14 @@
 
 Each decision is **Active**, **Superseded**, or **Transitional**.
 
+## 2026-07-24 — Provider terminal events own direct-answer completion
+
+**Status: Active**
+
+Assistant text is not itself proof that a direct-answer turn completed. Codex must emit `turn.completed`; Grok must emit a terminal `end` event with `stopReason: EndTurn`. Missing completion, max-turn exhaustion, malformed streams, and events after completion fail the durable job.
+
+Grok uses official streaming JSON so intermediate progress narration can be separated from the final text segment. Its direct-answer process runs in headless `dontAsk` mode with explicit read, search, and shell permission, an edit deny rule, and the read-only sandbox. This replaces the contradictory `plan` plus `--no-plan` invocation that prevented multi-step WorkOS inspection.
+
 ## 2026-07-24 — Every CLI invocation pins a concrete model
 
 **Status: Active**

@@ -24,6 +24,7 @@ class FakeProvider implements WorkspaceProvider {
   executionResult: WorkspaceExecutionResult;
   writePath: string | null;
   writeContent: string;
+  answerError: Error | null = null;
   answerCalls = 0;
   planCalls = 0;
 
@@ -42,6 +43,7 @@ class FakeProvider implements WorkspaceProvider {
 
   async answer(_input: WorkspaceProviderInput): Promise<string> {
     this.answerCalls += 1;
+    if (this.answerError) throw this.answerError;
     return this.answerResult;
   }
 
@@ -97,6 +99,27 @@ test("observe completes without writes and execute creates one receipt commit wi
     assert.equal(undo.undoOfReceiptId, receipts[0]!.id);
     assert.match(git(fixture.vault, ["log", "-1", "--pretty=%s"]), /Revert/u);
     await executeService.close();
+  } finally {
+    fixture.close();
+  }
+});
+
+test("incomplete provider output fails durably instead of completing the message", async () => {
+  const fixture = setupFixture();
+  try {
+    const provider = new FakeProvider(plan({ mode: "observe" }));
+    provider.answerError = new Error("AI provider returned no usable answer");
+    const service = new AiConversationService(fixture.store, provider, fixture.workspace);
+    const jobId = createTurn(fixture.store, fixture.conversationId, "운영 상태를 평가해봐");
+    service.enqueue(jobId);
+    await waitFor(() => fixture.store.getAiJob(jobId)?.status === "failed");
+
+    const job = fixture.store.getAiJob(jobId)!;
+    const message = fixture.store.getAiMessage(job.assistantMessageId)!;
+    assert.equal(message.status, "failed");
+    assert.equal(message.content, "AI provider returned no usable answer");
+    assert.match(job.error!, /no usable answer/u);
+    await service.close();
   } finally {
     fixture.close();
   }

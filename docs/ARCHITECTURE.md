@@ -38,7 +38,7 @@ It deliberately does not store projects, tasks, events, memos, snapshots, knowle
 1. The server validates the browser request and provider selection.
 2. It verifies that the provider has an owner grant and that the root remains valid.
 3. An ordinary or ambiguous question invokes the provider once with read-only permissions.
-4. The provider’s final answer text is persisted and returned without a structured schema rewrite.
+4. The adapter waits for the provider’s terminal completion event, discards intermediate progress segments, and persists only the final answer text without a structured schema rewrite.
 5. An explicit file-changing command instead runs a structured read-only preflight.
 6. The server validates the mutation plan and deterministically escalates risk when required.
 7. Govern pauses in `approval_required`.
@@ -52,7 +52,7 @@ Jobs survive browser reload and interrupted jobs are reconciled at server startu
 
 ## Provider boundary
 
-Both providers implement the same direct-answer, plan, and execution interfaces. Direct answers have no output schema and receive the owner’s request unchanged. CLI arguments are arrays and use `shell: false`. The configured WorkOS root is the working directory, allowing the provider to inherit WorkOS instructions naturally.
+Both providers implement the same direct-answer, plan, and execution interfaces. Direct answers have no output schema and receive the owner’s request unchanged. Provider-specific event parsers require explicit terminal completion rather than equating the first assistant text with success. CLI arguments are arrays and use `shell: false`. The configured WorkOS root is the working directory, allowing the provider to inherit WorkOS instructions naturally.
 
 Web search, MCP/apps, subagents, external review, and remote Git are disabled by default. A later workflow may add a narrowly scoped capability only behind Govern approval.
 

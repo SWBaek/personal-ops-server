@@ -122,13 +122,23 @@ export function buildDirectInvocation(input: WorkspaceProviderInput): Invocation
   const args = [
     "--no-auto-update",
     "--output-format",
-    "json",
+    "streaming-json",
     "--cwd",
     input.rootPath,
     "--max-turns",
     "20",
     "--permission-mode",
-    "plan",
+    "dontAsk",
+    "--allow",
+    "Read",
+    "--allow",
+    "Grep",
+    "--allow",
+    "Bash(*)",
+    "--deny",
+    "Edit",
+    "--sandbox",
+    "read-only",
     "--no-plan",
     "--disable-web-search",
     "--no-memory",
@@ -200,27 +210,58 @@ export function buildInvocation(input: WorkspaceProviderInput & {
 export function parseDirectProviderText(provider: AiProviderId, output: string): string {
   try {
     if (provider === "grok") {
-      const result = JSON.parse(output) as unknown;
-      if (isRecord(result) && typeof result.text === "string" && result.text.trim()) {
-        return result.text;
+      const segments: string[] = [];
+      let current = "";
+      let completed = false;
+      for (const line of output.split(/\r?\n/u)) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line) as unknown;
+        if (!isRecord(event) || typeof event.type !== "string") {
+          throw new Error("invalid Grok stream event");
+        }
+        if (completed) throw new Error("Grok emitted output after completion");
+        if (event.type === "text") {
+          if (typeof event.data !== "string") throw new Error("invalid Grok text event");
+          current += event.data;
+          continue;
+        }
+        if (current.trim()) {
+          segments.push(current);
+          current = "";
+        }
+        if (event.type === "end") {
+          if (event.stopReason !== "EndTurn") throw new Error("Grok turn did not complete");
+          completed = true;
+        }
       }
-      throw new Error("missing Grok response text");
+      if (!completed) throw new Error("missing Grok completion event");
+      const finalText = segments.at(-1);
+      if (!finalText?.trim()) throw new Error("missing Grok response text");
+      return finalText;
     }
     let finalText: string | null = null;
+    let completed = false;
     for (const line of output.split(/\r?\n/u)) {
       if (!line.trim()) continue;
       const event = JSON.parse(line) as unknown;
+      if (!isRecord(event) || typeof event.type !== "string") {
+        throw new Error("invalid Codex stream event");
+      }
+      if (completed) throw new Error("Codex emitted output after completion");
       if (
-        isRecord(event)
-        && event.type === "item.completed"
+        event.type === "item.completed"
         && isRecord(event.item)
         && event.item.type === "agent_message"
         && typeof event.item.text === "string"
       ) {
         finalText = event.item.text;
+      } else if (event.type === "turn.completed") {
+        completed = true;
+      } else if (event.type === "turn.failed") {
+        throw new Error("Codex turn failed");
       }
     }
-    if (!finalText?.trim()) throw new Error("missing Codex response text");
+    if (!completed || !finalText?.trim()) throw new Error("missing completed Codex response text");
     return finalText;
   } catch {
     throw new AiChatError("AI provider returned no usable answer", 502);

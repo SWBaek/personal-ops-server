@@ -132,6 +132,17 @@ test("direct provider invocations bypass structured planning and preserve the ow
   assert.ok(grok.args.includes("--no-plan"));
   assert.ok(grok.args.includes("--verbatim"));
   assert.ok(!grok.args.includes("--json-schema"));
+  assert.ok(grok.args.includes("streaming-json"));
+  assert.ok(grok.args.includes("dontAsk"));
+  assert.ok(grok.args.includes("Bash(*)"));
+  assert.deepEqual(grok.args.slice(grok.args.indexOf("--sandbox"), grok.args.indexOf("--sandbox") + 2), [
+    "--sandbox",
+    "read-only",
+  ]);
+  assert.deepEqual(grok.args.slice(grok.args.indexOf("--deny"), grok.args.indexOf("--deny") + 2), [
+    "--deny",
+    "Edit",
+  ]);
   assert.deepEqual(grok.args.slice(grok.args.indexOf("--model"), grok.args.indexOf("--model") + 2), [
     "--model",
     "grok-4.5",
@@ -142,7 +153,11 @@ test("direct provider invocations bypass structured planning and preserve the ow
 test("direct provider parsers return final answer text without schema rewriting", () => {
   const grokAnswer = "직접 답변입니다.\n\n- 첫 번째";
   assert.equal(
-    parseDirectProviderText("grok", JSON.stringify({ text: grokAnswer })),
+    parseDirectProviderText("grok", [
+      JSON.stringify({ type: "thought", data: "hidden" }),
+      JSON.stringify({ type: "text", data: grokAnswer }),
+      JSON.stringify({ type: "end", stopReason: "EndTurn", num_turns: 1 }),
+    ].join("\n")),
     grokAnswer,
   );
   const codexAnswer = "Codex의 **최종 답변**";
@@ -150,11 +165,46 @@ test("direct provider parsers return final answer text without schema rewriting"
     parseDirectProviderText("codex", [
       JSON.stringify({ type: "item.completed", item: { type: "reasoning", text: "hidden" } }),
       JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: codexAnswer } }),
+      JSON.stringify({ type: "turn.completed" }),
     ].join("\n")),
     codexAnswer,
   );
   assert.throws(
     () => parseDirectProviderText("grok", "not JSON"),
+    /AI provider returned no usable answer/u,
+  );
+});
+
+test("direct provider parsers ignore progress messages and require terminal completion", () => {
+  const progress = "관련 자료를 먼저 확인하겠습니다.";
+  const finalAnswer = "검토 결과, 운영 상태는 안정적입니다.";
+  assert.equal(
+    parseDirectProviderText("grok", [
+      JSON.stringify({ type: "thought", data: "first turn" }),
+      JSON.stringify({ type: "text", data: progress }),
+      JSON.stringify({ type: "thought", data: "second turn" }),
+      JSON.stringify({ type: "text", data: "검토 결과, " }),
+      JSON.stringify({ type: "text", data: "운영 상태는 안정적입니다." }),
+      JSON.stringify({ type: "end", stopReason: "EndTurn", num_turns: 2 }),
+    ].join("\n")),
+    finalAnswer,
+  );
+  assert.throws(
+    () => parseDirectProviderText("grok", [
+      JSON.stringify({ type: "text", data: progress }),
+      JSON.stringify({ type: "end", stopReason: "MaxTurns", num_turns: 20 }),
+    ].join("\n")),
+    /AI provider returned no usable answer/u,
+  );
+  assert.throws(
+    () => parseDirectProviderText("grok", JSON.stringify({ type: "text", data: progress })),
+    /AI provider returned no usable answer/u,
+  );
+  assert.throws(
+    () => parseDirectProviderText("codex", JSON.stringify({
+      type: "item.completed",
+      item: { type: "agent_message", text: finalAnswer },
+    })),
     /AI provider returned no usable answer/u,
   );
 });

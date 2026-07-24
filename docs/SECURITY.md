@@ -34,6 +34,7 @@ Direct-answer turns may inspect the configured root only with read-only provider
 ## Authority
 
 - Direct answers cannot mutate; ambiguous requests default to this path.
+- Grok direct answers use explicit read-only tool permission, deny edit operations, and run under the read-only sandbox; Codex retains its read-only sandbox.
 - Operate is bounded by the owner’s current request and server-validated paths.
 - Govern requires a visible plan and separate approval.
 - External network, MCP/apps, subagents, external review, remote Git, deletion, moves, bulk rewrites, and policy changes are Govern capabilities.
@@ -55,6 +56,7 @@ Fastify binds to localhost. Remote browser access uses the owner-only tailnet th
 ## Failure behavior
 
 - unavailable AI reports a durable failure rather than fabricated completion;
+- missing terminal completion, max-turn exhaustion, and unterminated progress-only streams fail instead of becoming completed messages;
 - dirty WorkOS blocks mutation;
 - malformed plans/results fail closed;
 - unexpected or residual edits enter `needs_review`;

@@ -27,6 +27,8 @@ codex debug models
 
 Direct answers use `codex exec` with JSON event framing, ephemeral state, read-only sandbox, and the WorkOS root as `-C`; the final agent message is passed through without a structured output schema.
 
+The adapter accepts the answer only after a `turn.completed` event. An agent-message event without terminal completion is incomplete and fails the durable job.
+
 Mutation planning uses the same read-only sandbox with a structured output schema.
 
 Execution uses the same root with workspace-write sandbox and a structured result schema. Web search, apps/MCP, and multi-agent behavior are disabled unless the current Govern approval explicitly grants the capability.
@@ -42,7 +44,9 @@ grok version
 grok models
 ```
 
-Direct answers run in the WorkOS root with read-only permission, planning behavior disabled, provider JSON framing, no memory, disabled web search, and no subagents. The outer framing is removed and its final text is passed through unchanged.
+Direct answers run in the WorkOS root with planning behavior disabled, streaming JSON framing, no memory, disabled web search, and no subagents. Headless `dontAsk` permission explicitly allows `Read`, `Grep`, and shell commands while denying `Edit`; the `read-only` sandbox is a second filesystem boundary. This lets an agent complete multi-step local inspection without granting a mutation.
+
+The adapter treats text before another thought or tool step as an intermediate progress segment. It waits for the terminal `end` event with `stopReason: EndTurn`, returns only the final text segment unchanged, and rejects missing completion, max-turn exhaustion, malformed events, or output after completion.
 
 Mutation planning runs in the WorkOS root with plan permission mode and a structured output schema.
 
@@ -52,7 +56,7 @@ Use official Grok Build only; do not substitute a similarly named API-key client
 
 ## Direct answer
 
-A direct answer has no application schema and no second model pass. The server stores exactly the final assistant text extracted from the provider’s transport framing. It never interprets a plan-like sentence as successful mutation, and the provider receives no write permission.
+A direct answer has no application schema and no second model pass. The server stores exactly the final assistant text extracted after the provider’s terminal completion event. Intermediate progress messages and hidden thoughts are not persisted or shown as completed answers. It never interprets a plan-like sentence as successful mutation, and the provider receives no write permission.
 
 ## Required mutation plan
 
