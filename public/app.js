@@ -406,8 +406,10 @@ function renderWorkspace() {
   const name = document.createElement("strong");
   name.textContent = configuration.rootPath.split(/[\\/]/).filter(Boolean).at(-1) || "WorkOS";
   const path = document.createElement("span");
+  path.className = "mono-text";
   path.textContent = configuration.rootPath;
   const branch = document.createElement("span");
+  branch.className = "mono-text";
   branch.textContent = `Branch · ${validation.branch || "(detached)"}`;
   const providers = document.createElement("span");
   providers.textContent = `허용 · ${[configuration.codexGranted && "Codex", configuration.grokGranted && "Grok"].filter(Boolean).join(", ")}`;

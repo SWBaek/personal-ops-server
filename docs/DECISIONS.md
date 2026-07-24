@@ -2,6 +2,14 @@
 
 Each decision is **Active**, **Superseded**, or **Transitional**.
 
+## 2026-07-24 — Semantic variable-font stacks with resilient CDN loading
+
+**Status: Active**
+
+Pretendard Variable is the default family for UI controls, headings, prose, and tables. JetBrains Mono Variable is reserved for code, logs, paths, commands, diffs, and identifiers.
+
+The browser loads version-pinned font stylesheets from a public font CDN. No WorkOS or conversation content is placed in font URLs. Both families have local system fallbacks, and application startup, conversation, and responsive layout must remain functional when CDN requests fail.
+
 ## 2026-07-24 — Preserve Markdown evidence; sanitize only at presentation
 
 **Status: Active**
