@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { AiConversationService } from "../src/ai/streaming-service.js";
 import type {
+  ProviderRunOutcome,
   WorkspaceExecutionInput,
   WorkspaceProvider,
   WorkspaceProviderInput,
@@ -25,6 +26,9 @@ class FakeProvider implements WorkspaceProvider {
   writePath: string | null;
   writeContent: string;
   answerError: Error | null = null;
+  answerOutcome: ProviderRunOutcome<string> | null = null;
+  planOutcome: ProviderRunOutcome<WorkspaceTurnPlan> | null = null;
+  executionOutcome: ProviderRunOutcome<WorkspaceExecutionResult> | null = null;
   answerCalls = 0;
   planCalls = 0;
 
@@ -41,7 +45,7 @@ class FakeProvider implements WorkspaceProvider {
     };
   }
 
-  async answer(_input: WorkspaceProviderInput): Promise<string> {
+  async answer(_input: WorkspaceProviderInput): Promise<ProviderRunOutcome<string>> {
     this.answerCalls += 1;
     if (this.answerError) throw this.answerError;
     const now = new Date().toISOString();
@@ -49,18 +53,31 @@ class FakeProvider implements WorkspaceProvider {
     _input.onProgress?.({ type: "signal", at: now, phase: "checking_workos" });
     _input.onProgress?.({ type: "signal", at: now, phase: "composing" });
     _input.onProgress?.({ type: "stopped", at: now });
-    return this.answerResult;
+    return this.answerOutcome ?? completed(this.answerResult);
   }
 
-  async plan(_input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
+  async plan(_input: WorkspaceProviderInput): Promise<ProviderRunOutcome<WorkspaceTurnPlan>> {
     this.planCalls += 1;
-    return this.planResult;
+    return this.planOutcome ?? completed(this.planResult);
   }
 
-  async execute(input: WorkspaceExecutionInput): Promise<WorkspaceExecutionResult> {
+  async execute(input: WorkspaceExecutionInput): Promise<ProviderRunOutcome<WorkspaceExecutionResult>> {
     if (this.writePath) writeFileSync(join(input.rootPath, this.writePath), this.writeContent, "utf8");
-    return this.executionResult;
+    return this.executionOutcome ?? completed(this.executionResult);
   }
+}
+
+function completed<T>(value: T): ProviderRunOutcome<T> {
+  return {
+    kind: "completed",
+    value,
+    evidence: {
+      provider: "codex",
+      protocol: "codex-jsonl-final-file",
+      terminalReason: "end_turn",
+      artifact: "output-last-message",
+    },
+  };
 }
 
 test("observe completes without writes and execute creates one receipt commit with Undo", async () => {
@@ -113,7 +130,7 @@ test("incomplete provider output fails durably instead of completing the message
   const fixture = setupFixture();
   try {
     const provider = new FakeProvider(plan({ mode: "observe" }));
-    provider.answerError = new Error("AI provider returned no usable answer");
+    provider.answerOutcome = { kind: "incomplete", reason: "missing_final" };
     const service = new AiConversationService(fixture.store, provider, fixture.workspace);
     const jobId = createTurn(fixture.store, fixture.conversationId, "운영 상태를 평가해봐");
     service.enqueue(jobId);
@@ -122,11 +139,93 @@ test("incomplete provider output fails durably instead of completing the message
     const job = fixture.store.getAiJob(jobId)!;
     const message = fixture.store.getAiMessage(job.assistantMessageId)!;
     assert.equal(message.status, "failed");
-    assert.equal(message.content, "AI provider returned no usable answer");
-    assert.match(job.error!, /no usable answer/u);
+    assert.match(message.content, /authoritative final artifact/u);
+    assert.match(job.error!, /missing_final/u);
     await service.close();
   } finally {
     fixture.close();
+  }
+});
+
+test("non-completed or mismatched outcomes cannot succeed answer, plan, or execute transitions", async () => {
+  for (const stage of ["answer", "plan", "execute", "mismatched_evidence"] as const) {
+    const fixture = setupFixture();
+    try {
+      const provider = new FakeProvider(plan({
+        mode: "execute",
+        summary: "Update README",
+        expectedPaths: ["README.md"],
+      }), null);
+      if (stage === "answer") {
+        provider.answerOutcome = { kind: "cancelled", source: "provider" };
+      } else if (stage === "plan") {
+        provider.planOutcome = { kind: "incomplete", reason: "max_turns" };
+      } else if (stage === "mismatched_evidence") {
+        provider.answerOutcome = {
+          kind: "completed",
+          value: "must not succeed",
+          evidence: {
+            provider: "grok",
+            protocol: "grok-json",
+            terminalReason: "end_turn",
+            artifact: "json-object",
+          },
+        };
+      } else {
+        provider.executionOutcome = { kind: "failed", reason: "nonzero_exit" };
+      }
+      const service = new AiConversationService(fixture.store, provider, fixture.workspace);
+      const request = stage === "answer" || stage === "mismatched_evidence"
+        ? "상태를 알려줘"
+        : "README를 업데이트해";
+      const jobId = createTurn(fixture.store, fixture.conversationId, request);
+      service.enqueue(jobId);
+      await waitFor(() => fixture.store.getAiJob(jobId)?.status === "failed");
+      const job = fixture.store.getAiJob(jobId)!;
+      assert.notEqual(job.status, "succeeded");
+      assert.equal(fixture.store.getAiMessage(job.assistantMessageId)!.status, "failed");
+      assert.equal(fixture.store.listReceipts().length, 0);
+      await service.close();
+    } finally {
+      fixture.close();
+    }
+  }
+});
+
+test("owner cancellation is cancelled, while incomplete execution with edits needs review", async () => {
+  const ownerFixture = setupFixture();
+  try {
+    const ownerProvider = new FakeProvider(plan({ mode: "observe" }));
+    ownerProvider.answerOutcome = { kind: "cancelled", source: "owner" };
+    const ownerService = new AiConversationService(ownerFixture.store, ownerProvider, ownerFixture.workspace);
+    const ownerJobId = createTurn(ownerFixture.store, ownerFixture.conversationId, "상태를 알려줘");
+    ownerService.enqueue(ownerJobId);
+    await waitFor(() => ownerFixture.store.getAiJob(ownerJobId)?.status === "cancelled");
+    assert.equal(ownerFixture.store.getAiMessage(
+      ownerFixture.store.getAiJob(ownerJobId)!.assistantMessageId,
+    )!.status, "cancelled");
+    await ownerService.close();
+  } finally {
+    ownerFixture.close();
+  }
+
+  const editFixture = setupFixture();
+  try {
+    const editProvider = new FakeProvider(plan({
+      mode: "execute",
+      summary: "Update README",
+      expectedPaths: ["README.md"],
+    }), "README.md");
+    editProvider.executionOutcome = { kind: "incomplete", reason: "missing_final" };
+    const editService = new AiConversationService(editFixture.store, editProvider, editFixture.workspace);
+    const editJobId = createTurn(editFixture.store, editFixture.conversationId, "README를 업데이트해");
+    editService.enqueue(editJobId);
+    await waitFor(() => editFixture.store.getAiJob(editJobId)?.status === "needs_review");
+    assert.deepEqual(editFixture.workspace.changedPaths(editFixture.vault), ["README.md"]);
+    assert.equal(editFixture.store.listReceipts().length, 0);
+    await editService.close();
+  } finally {
+    editFixture.close();
   }
 });
 

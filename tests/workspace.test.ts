@@ -9,8 +9,9 @@ import {
   buildDirectInvocation,
   buildInvocation,
   createProviderProgressParser,
-  parseDirectProviderText,
-  parseProviderJson,
+  inspectFinalArtifact,
+  parseDirectProviderOutcome,
+  parseStructuredProviderOutcome,
 } from "../src/ai/workspace-provider.js";
 import {
   enforceWorkspaceRisk,
@@ -133,7 +134,8 @@ test("direct provider invocations bypass structured planning and preserve the ow
   assert.ok(grok.args.includes("--no-plan"));
   assert.ok(grok.args.includes("--verbatim"));
   assert.ok(!grok.args.includes("--json-schema"));
-  assert.ok(grok.args.includes("streaming-json"));
+  assert.ok(grok.args.includes("json"));
+  assert.ok(!grok.args.includes("streaming-json"));
   assert.ok(grok.args.includes("dontAsk"));
   assert.ok(grok.args.includes("Bash(*)"));
   assert.deepEqual(grok.args.slice(grok.args.indexOf("--sandbox"), grok.args.indexOf("--sandbox") + 2), [
@@ -151,113 +153,99 @@ test("direct provider invocations bypass structured planning and preserve the ow
   assert.equal(grok.args.at(-1), base.message);
 });
 
-test("direct provider parsers return final answer text without schema rewriting", () => {
+test("direct provider parsers require provider-owned final artifacts", () => {
   const grokAnswer = "직접 답변입니다.\n\n- 첫 번째";
-  assert.equal(
-    parseDirectProviderText("grok", [
-      JSON.stringify({ type: "thought", data: "hidden" }),
-      JSON.stringify({ type: "text", data: grokAnswer }),
-      JSON.stringify({ type: "end", stopReason: "EndTurn", num_turns: 1 }),
-    ].join("\n")),
-    grokAnswer,
-  );
+  assert.deepEqual(parseDirectProviderOutcome("grok", JSON.stringify({
+    text: grokAnswer,
+    stopReason: "EndTurn",
+    sessionId: "discard-me",
+    metadata: { path: "private/path.md" },
+  })), {
+    kind: "completed",
+    value: grokAnswer,
+    evidence: {
+      provider: "grok",
+      protocol: "grok-json",
+      terminalReason: "end_turn",
+      artifact: "json-object",
+    },
+  });
   const codexAnswer = "Codex의 **최종 답변**";
-  assert.equal(
-    parseDirectProviderText("codex", [
-      JSON.stringify({ type: "item.completed", item: { type: "reasoning", text: "hidden" } }),
-      JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: codexAnswer } }),
-      JSON.stringify({ type: "turn.completed" }),
-    ].join("\n")),
+  assert.equal(parseDirectProviderOutcome(
+    "codex",
+    `${JSON.stringify({ type: "turn.completed" })}\n`,
     codexAnswer,
-  );
-  assert.throws(
-    () => parseDirectProviderText("grok", "not JSON"),
-    /AI provider returned no usable answer/u,
-  );
+  ).kind, "completed");
+  assert.deepEqual(parseDirectProviderOutcome("grok", "not JSON"), {
+    kind: "incomplete",
+    reason: "malformed_final",
+  });
 });
 
-test("direct provider parsers ignore progress messages and require terminal completion", () => {
-  const progress = "관련 자료를 먼저 확인하겠습니다.";
+test("Grok accepts only EndTurn and rejects cancellation and limits even with text", () => {
   const finalAnswer = "검토 결과, 운영 상태는 안정적입니다.";
-  assert.equal(
-    parseDirectProviderText("grok", [
-      JSON.stringify({ type: "thought", data: "first turn" }),
-      JSON.stringify({ type: "text", data: progress }),
-      JSON.stringify({ type: "thought", data: "second turn" }),
-      JSON.stringify({ type: "text", data: "검토 결과, " }),
-      JSON.stringify({ type: "text", data: "운영 상태는 안정적입니다." }),
-      JSON.stringify({ type: "end", stopReason: "EndTurn", num_turns: 2 }),
-    ].join("\n")),
-    finalAnswer,
-  );
-  assert.throws(
-    () => parseDirectProviderText("grok", [
-      JSON.stringify({ type: "text", data: progress }),
-      JSON.stringify({ type: "end", stopReason: "MaxTurns", num_turns: 20 }),
-    ].join("\n")),
-    /AI provider returned no usable answer/u,
-  );
-  assert.throws(
-    () => parseDirectProviderText("grok", JSON.stringify({ type: "text", data: progress })),
-    /AI provider returned no usable answer/u,
-  );
-  assert.throws(
-    () => parseDirectProviderText("codex", JSON.stringify({
-      type: "item.completed",
-      item: { type: "agent_message", text: finalAnswer },
-    })),
-    /AI provider returned no usable answer/u,
-  );
+  assert.equal(parseDirectProviderOutcome("grok", JSON.stringify({
+    text: finalAnswer,
+    stopReason: "EndTurn",
+  })).kind, "completed");
+  assert.deepEqual(parseDirectProviderOutcome("grok", JSON.stringify({
+    text: finalAnswer,
+    stopReason: "Cancelled",
+  })), { kind: "cancelled", source: "provider" });
+  assert.deepEqual(parseDirectProviderOutcome("grok", JSON.stringify({
+    text: finalAnswer,
+    stopReason: "MaxTurns",
+  })), { kind: "incomplete", reason: "max_turns" });
+  assert.deepEqual(parseDirectProviderOutcome("grok", JSON.stringify({
+    text: finalAnswer,
+    stopReason: "MaxTokens",
+  })), { kind: "incomplete", reason: "max_tokens" });
+  assert.deepEqual(parseDirectProviderOutcome("grok", JSON.stringify({
+    text: finalAnswer,
+    stopReason: "FutureReason",
+  })), { kind: "incomplete", reason: "unknown_terminal" });
+  assert.deepEqual(parseDirectProviderOutcome("grok", JSON.stringify({
+    text: finalAnswer,
+  })), { kind: "incomplete", reason: "missing_completion" });
+  assert.deepEqual(parseDirectProviderOutcome("grok", JSON.stringify({
+    text: "",
+    stopReason: "EndTurn",
+  })), { kind: "incomplete", reason: "missing_final" });
 });
 
-test("Grok parser accepts matching post-terminal envelopes and rejects later content", () => {
-  const answer = "최종 답변";
-  const base = [
-    JSON.stringify({ type: "text", data: answer }),
-    JSON.stringify({ type: "end", stopReason: "EndTurn", num_turns: 2 }),
-  ];
-  assert.equal(
-    parseDirectProviderText("grok", [
-      ...base,
-      JSON.stringify({ type: "result", result: answer, duration_ms: 1200 }),
-      JSON.stringify({ type: "usage", usage: { input_tokens: 10 } }),
-    ].join("\n")),
-    answer,
-  );
-  assert.throws(
-    () => parseDirectProviderText("grok", [
-      ...base,
-      JSON.stringify({ type: "result", result: "different answer" }),
-    ].join("\n")),
-    /AI provider returned no usable answer/u,
-  );
-  assert.throws(
-    () => parseDirectProviderText("grok", [
-      ...base,
-      JSON.stringify({ type: "text", data: "late content" }),
-    ].join("\n")),
-    /AI provider returned no usable answer/u,
-  );
+test("Codex requires both turn.completed and a non-empty final file value", () => {
+  const completed = `${JSON.stringify({ type: "turn.completed", requestId: "discard" })}\n`;
+  assert.equal(parseDirectProviderOutcome("codex", completed, "final answer").kind, "completed");
+  assert.deepEqual(parseDirectProviderOutcome("codex", completed, ""), {
+    kind: "incomplete",
+    reason: "empty_final",
+  });
+  assert.deepEqual(parseDirectProviderOutcome("codex", JSON.stringify({
+    type: "item.completed",
+    item: { type: "agent_message", text: "not authoritative" },
+  }), "final answer"), {
+    kind: "incomplete",
+    reason: "missing_completion",
+  });
 });
 
-test("Grok parser preserves a complete answer when the CLI exits zero with Cancelled", () => {
-  const answer = "완성된 최종 답변";
-  assert.equal(
-    parseDirectProviderText("grok", [
-      JSON.stringify({ type: "thought", data: "intermediate" }),
-      JSON.stringify({ type: "text", data: answer }),
-      JSON.stringify({ type: "end", stopReason: "Cancelled", num_turns: 2 }),
-    ].join("\n")),
-    answer,
-  );
-  assert.throws(
-    () => parseDirectProviderText("grok", JSON.stringify({
-      type: "end",
-      stopReason: "Cancelled",
-      num_turns: 2,
-    })),
-    /AI provider returned no usable answer/u,
-  );
+test("Codex final artifact inspection rejects missing, empty, and oversized files", () => {
+  const temporary = mkdtempSync(join(tmpdir(), "ops-final-artifact-"));
+  try {
+    const artifact = join(temporary, "final.txt");
+    assert.deepEqual(inspectFinalArtifact(artifact), { kind: "incomplete", reason: "missing_final" });
+    writeFileSync(artifact, "", "utf8");
+    assert.deepEqual(inspectFinalArtifact(artifact), { kind: "incomplete", reason: "empty_final" });
+    writeFileSync(artifact, "x".repeat(1024 * 1024 + 1), "utf8");
+    assert.deepEqual(inspectFinalArtifact(artifact), {
+      kind: "incomplete",
+      reason: "artifact_too_large",
+    });
+    writeFileSync(artifact, "authoritative final", "utf8");
+    assert.equal(inspectFinalArtifact(artifact).kind, "completed");
+  } finally {
+    rmSync(temporary, { recursive: true, force: true });
+  }
 });
 
 test("only explicit change commands enter the mutation workflow", () => {
@@ -272,58 +260,59 @@ test("only explicit change commands enter the mutation workflow", () => {
 
 test("Grok parser accepts one structured object with provider framing or trailing prose", () => {
   assert.deepEqual(
-    parseProviderJson("grok", JSON.stringify({
+    parseStructuredProviderOutcome("grok", JSON.stringify({
       text: "This text is intentionally not JSON.",
       structuredOutput: { answer: "verified" },
-    })),
-    { answer: "verified" },
+      stopReason: "EndTurn",
+    })).kind,
+    "completed",
   );
-  assert.deepEqual(
-    parseProviderJson("grok", JSON.stringify({
+  const stringStructured = parseStructuredProviderOutcome("grok", JSON.stringify({
       text: "ignored",
       structuredOutput: "{\"answer\":\"string representation\"}",
-    })),
-    { answer: "string representation" },
-  );
-  assert.deepEqual(
-    parseProviderJson("grok", JSON.stringify({
+      stopReason: "EndTurn",
+    }));
+  assert.equal(stringStructured.kind, "completed");
+  if (stringStructured.kind === "completed") {
+    assert.deepEqual(stringStructured.value, { answer: "string representation" });
+  }
+  const fenced = parseStructuredProviderOutcome("grok", JSON.stringify({
       text: "```json\n{\"answer\":\"brace } inside a string\"}\n```",
-    })),
-    { answer: "brace } inside a string" },
-  );
-  assert.deepEqual(
-    parseProviderJson("grok", JSON.stringify({
+      stopReason: "EndTurn",
+    }));
+  assert.equal(fenced.kind, "completed");
+  const prose = parseStructuredProviderOutcome("grok", JSON.stringify({
       text: "{\"answer\":\"ok\"}\nAdditional provider commentary.",
-    })),
-    { answer: "ok" },
-  );
+      stopReason: "EndTurn",
+    }));
+  assert.equal(prose.kind, "completed");
 });
 
 test("provider parser rejects malformed or ambiguous structured output with a safe error", () => {
-  assert.throws(
-    () => parseProviderJson("grok", JSON.stringify({ text: "{\"answer\":" })),
-    /AI provider returned an invalid structured result/u,
-  );
-  assert.throws(
-    () => parseProviderJson("grok", JSON.stringify({ text: "{\"answer\":1}{\"answer\":2}" })),
-    /AI provider returned an invalid structured result/u,
-  );
-  assert.throws(
-    () => parseProviderJson("grok", "not outer JSON"),
-    /AI provider returned an invalid structured result/u,
-  );
+  assert.deepEqual(parseStructuredProviderOutcome("grok", JSON.stringify({
+    text: "{\"answer\":",
+    stopReason: "EndTurn",
+  })), { kind: "incomplete", reason: "malformed_final" });
+  assert.deepEqual(parseStructuredProviderOutcome("grok", JSON.stringify({
+    text: "{\"answer\":1}{\"answer\":2}",
+    stopReason: "EndTurn",
+  })), { kind: "incomplete", reason: "malformed_final" });
+  assert.deepEqual(parseStructuredProviderOutcome("grok", "not outer JSON"), {
+    kind: "incomplete",
+    reason: "malformed_final",
+  });
 });
 
 test("progress parser handles split UTF-8 JSONL and emits only safe server phases", () => {
   const secret = "private/경로.md";
   const encoded = new TextEncoder().encode([
-    JSON.stringify({ type: "thought", data: `hidden reasoning ${secret}` }),
-    JSON.stringify({ type: "text", data: `answer fragment ${secret}` }),
-    JSON.stringify({ type: "end", stopReason: "EndTurn", toolArgs: { path: secret } }),
+    JSON.stringify({ type: "thread.started", sessionId: secret }),
+    JSON.stringify({ type: "item.completed", item: { text: `answer fragment ${secret}` } }),
+    JSON.stringify({ type: "turn.completed", toolArgs: { path: secret }, requestId: secret }),
     "",
   ].join("\n"));
   const events: unknown[] = [];
-  const parser = createProviderProgressParser("grok", (event) => events.push(event));
+  const parser = createProviderProgressParser("codex", (event) => events.push(event));
   for (let index = 0; index < encoded.length; index += 3) {
     parser.push(encoded.slice(index, index + 3));
   }

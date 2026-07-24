@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 
 import { AiConversationService } from "../../src/ai/streaming-service.js";
 import type {
+  ProviderRunOutcome,
   WorkspaceExecutionInput,
   WorkspaceProvider,
   WorkspaceProviderInput,
@@ -24,7 +25,7 @@ const vault = join(root, "synthetic-workos");
 createGitWorkspace(vault);
 
 const provider: WorkspaceProvider = {
-  async answer(input: WorkspaceProviderInput): Promise<string> {
+  async answer(input: WorkspaceProviderInput): Promise<ProviderRunOutcome<string>> {
     const startedAt = new Date().toISOString();
     input.onProgress?.({ type: "started", at: startedAt });
     input.onProgress?.({ type: "signal", at: startedAt, phase: "checking_workos" });
@@ -32,7 +33,7 @@ const provider: WorkspaceProvider = {
     input.onProgress?.({ type: "signal", at: new Date().toISOString(), phase: "composing" });
     input.onProgress?.({ type: "stopped", at: new Date().toISOString() });
     if (input.message.includes("Markdown")) {
-      return [
+      return completed([
         "## 프로젝트 요약",
         "",
         "- 첫 번째 결과",
@@ -52,17 +53,17 @@ const provider: WorkspaceProvider = {
         "[위험한 링크](javascript:alert(1))",
         "<img src=x onerror=\"window.__markdownXss = true\">",
         "<script>window.__markdownXss = true</script>",
-      ].join("\n");
+      ].join("\n"), input.provider);
     }
     if (input.message.includes("일정")) {
-      return "합성 WorkOS에는 오늘 등록된 일정이 없습니다.";
+      return completed("합성 WorkOS에는 오늘 등록된 일정이 없습니다.", input.provider);
     }
-    return "합성 WorkOS를 직접 읽고 답변했습니다.";
+    return completed("합성 WorkOS를 직접 읽고 답변했습니다.", input.provider);
   },
-  async plan(input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
+  async plan(input: WorkspaceProviderInput): Promise<ProviderRunOutcome<WorkspaceTurnPlan>> {
     await delay(80, input.signal);
     if (input.message.includes("일정")) {
-      return {
+      return completed({
         mode: "observe",
         summary: "Read schedule",
         reply: "합성 WorkOS에는 오늘 등록된 일정이 없습니다.",
@@ -72,10 +73,10 @@ const provider: WorkspaceProvider = {
         capabilities: ["local"],
         rationale: "읽기 질문입니다.",
         requiresApproval: false,
-      };
+      }, input.provider);
     }
     const govern = input.message.includes("AGENTS");
-    return {
+    return completed({
       mode: govern ? "govern" : "execute",
       summary: govern ? "Update AGENTS instructions" : "Update README note",
       reply: govern ? "운영 규칙 변경은 승인이 필요합니다." : "README 변경을 준비했습니다.",
@@ -85,22 +86,35 @@ const provider: WorkspaceProvider = {
       capabilities: ["local"],
       rationale: govern ? "AGENTS.md는 Govern 영역입니다." : "사용자가 단일 문서 수정을 요청했습니다.",
       requiresApproval: govern,
-    };
+    }, input.provider);
   },
-  async execute(input: WorkspaceExecutionInput): Promise<WorkspaceExecutionResult> {
+  async execute(input: WorkspaceExecutionInput): Promise<ProviderRunOutcome<WorkspaceExecutionResult>> {
     await delay(100, input.signal);
     const path = input.plan.expectedPaths[0]!;
     const target = join(input.rootPath, path);
     const current = readFileSync(target, "utf8");
     writeFileSync(target, `${current.trimEnd()}\n\nAssistant verified change.\n`, "utf8");
-    return {
+    return completed({
       reply: `${path}를 변경하고 검증했습니다.`,
       semanticSummary: `Update ${path}`,
       changedPaths: [path],
       validation: ["Markdown file remains readable"],
-    };
+    }, input.provider);
   },
 };
+
+function completed<T>(value: T, provider: "codex" | "grok"): ProviderRunOutcome<T> {
+  return {
+    kind: "completed",
+    value,
+    evidence: {
+      provider,
+      protocol: provider === "codex" ? "codex-jsonl-final-file" : "grok-json",
+      terminalReason: "end_turn",
+      artifact: provider === "codex" ? "output-last-message" : "json-object",
+    },
+  };
+}
 
 const store = new OpsStore(join(root, "workos-runtime.db"));
 const workspace = new GitWorkspace();

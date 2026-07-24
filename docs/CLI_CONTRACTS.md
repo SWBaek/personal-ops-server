@@ -6,7 +6,9 @@ Only official locally installed subscription-authenticated `codex` and `grok` CL
 
 For ordinary questions, both adapters receive the owner’s request unchanged and return the provider’s final assistant text without an application-owned output schema. Explicit mutations use the same application-owned plan/result schemas. The working directory is the configured WorkOS Git root. Mutation prompts state that WorkOS instructions are canonical, assistant persona is subordinate, and the provider must not commit, push, pull, or modify remotes.
 
-Processes use argument arrays with `shell: false`. User text is never interpolated into a shell command. Output and runtime are bounded; raw stderr, hidden reasoning, credentials, and provider session identifiers stay server-side.
+Processes use argument arrays with `shell: false`. User text is never interpolated into a shell command. Output and runtime are bounded; provider bodies, raw stderr, hidden reasoning, tool arguments, paths, credentials, metadata, and provider/session/request identifiers are discarded and never cross the adapter boundary.
+
+Every answer, plan, and execution returns a discriminated provider outcome. Exit code zero, process exit, a last text segment, progress, liveness, and SSE termination are not completion evidence. Only `completed`, backed by the documented normal terminal reason and a provider-owned final artifact, can authorize a successful job/message transition.
 
 Every invocation includes a concrete `--model` value. The product does not expose or persist a generic `default` model because that would let a CLI upgrade silently change which model handles the owner's work. The versioned product catalog follows the locally verified, list-visible CLI catalog:
 
@@ -27,7 +29,7 @@ codex debug models
 
 Direct answers use `codex exec` with JSON event framing, ephemeral state, read-only sandbox, and the WorkOS root as `-C`; the final agent message is passed through without a structured output schema.
 
-The adapter accepts the answer only after a `turn.completed` event. An agent-message event without terminal completion is incomplete and fails the durable job.
+Every Codex invocation pairs JSONL progress with `--output-last-message` in a unique runtime-only temporary directory. The adapter accepts a value only after exit zero, `turn.completed`, and a non-empty final file within the one MiB bound. JSONL agent-message events are never reconstructed into final content. The temporary directory is removed on success, failure, timeout, and cancellation.
 
 Mutation planning uses the same read-only sandbox with a structured output schema.
 
@@ -44,9 +46,9 @@ grok version
 grok models
 ```
 
-Direct answers run in the WorkOS root with planning behavior disabled, streaming JSON framing, no memory, disabled web search, and no subagents. Headless `dontAsk` permission explicitly allows `Read`, `Grep`, and shell commands while denying `Edit`; the `read-only` sandbox is a second filesystem boundary. This lets an agent complete multi-step local inspection without granting a mutation.
+Direct answers run in the WorkOS root with planning behavior disabled, one-object JSON framing, no memory, disabled web search, and no subagents. Headless `dontAsk` permission explicitly allows `Read`, `Grep`, and shell commands while denying `Edit`; the `read-only` sandbox is a second filesystem boundary. This lets an agent complete multi-step local inspection without granting a mutation.
 
-The adapter treats text before another thought or tool step as an intermediate progress segment. It waits for a terminal `end` event and returns only the final non-empty text segment unchanged. `EndTurn` is the normal terminal reason. Grok 0.2.111 may instead exit zero with `Cancelled` after emitting a complete final segment; this is accepted because owner cancellation aborts and kills the process before parsing. A matching `result` envelope and content-free `usage` metadata may follow completion; later text, thought, tool, mismatched result, unknown output, missing text, max-turn exhaustion, and malformed events fail the job.
+The adapter waits for process exit and parses exactly one JSON object. Success requires exit zero, `stopReason: EndTurn`, and non-empty `text` or valid `structuredOutput`. `Cancelled`, `MaxTurns`, `MaxTokens`, missing or unknown terminal reasons, malformed output, and missing/empty final data are non-success even when response text exists. Owner AbortSignal cancellation is the only outcome mapped to a cancelled job. ACP-based structured progress is deferred to a separate decision.
 
 Mutation planning runs in the WorkOS root with plan permission mode and a structured output schema.
 
@@ -56,7 +58,7 @@ Use official Grok Build only; do not substitute a similarly named API-key client
 
 ## Direct answer
 
-A direct answer has no application schema and no second model pass. The server stores exactly the final assistant text extracted after the provider’s terminal completion event. Intermediate progress messages and hidden thoughts are not persisted or shown as completed answers. It never interprets a plan-like sentence as successful mutation, and the provider receives no write permission.
+A direct answer has no application schema and no second model pass. The server stores exactly the authoritative final artifact text after lifecycle validation. Intermediate progress messages and hidden thoughts are not persisted or shown as completed answers. It never interprets a plan-like sentence as successful mutation, and the provider receives no write permission.
 
 ## Required mutation plan
 

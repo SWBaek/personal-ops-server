@@ -53,7 +53,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.get("/api/health", async () => ({
     ok: true,
-    build: "workos-chat-view-v1",
+    build: "provider-final-artifacts-33",
     now: new Date().toISOString(),
   }));
 
@@ -61,7 +61,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     runtime: {
       environment: options.environment ?? "test",
       mode: "workos-native",
-      build: "workos-chat-view-v1",
+      build: "provider-final-artifacts-33",
     },
   }));
 

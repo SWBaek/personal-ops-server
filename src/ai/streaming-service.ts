@@ -14,7 +14,13 @@ import {
   type OpsStore,
   type WorkspaceReceipt,
 } from "../infra/store.js";
-import type { ProviderPhase, ProviderProgressEvent, WorkspaceProvider } from "./workspace-provider.js";
+import type {
+  ProviderCompletionEvidence,
+  ProviderPhase,
+  ProviderProgressEvent,
+  ProviderRunOutcome,
+  WorkspaceProvider,
+} from "./workspace-provider.js";
 
 export interface AiJobSnapshot {
   job: AiJob;
@@ -217,7 +223,7 @@ export class AiConversationService {
       this.#store.transitionJob(job.id, "planning", { plan: null, error: null });
       this.#emit(job.id, { type: "status", status: "planning" });
       this.#activity(job.id, "reading", `${job.provider}가 WorkOS에서 직접 답변합니다.`);
-      const answer = await this.#provider.answer({
+      const answerOutcome = await this.#provider.answer({
         provider: job.provider,
         model: job.model,
         reasoningEffort: job.reasoningEffort,
@@ -227,11 +233,14 @@ export class AiConversationService {
         signal: controller.signal,
         onProgress: this.#providerProgress(job.id),
       });
+      const answerCompletion = requireCompletion(answerOutcome, job.provider);
+      const answer = answerCompletion.value;
       this.#store.transitionJob(job.id, "succeeded", {
         plan: null,
         content: answer,
         error: null,
       });
+      this.#activity(job.id, "validation", completionSummary(answerCompletion.evidence));
       this.#activity(job.id, "validation", "CLI 최종 답변을 그대로 전달했으며 WorkOS 변경은 없습니다.");
       this.#emit(job.id, { type: "completed", snapshot: this.snapshot(job.id)! });
     } catch (error) {
@@ -262,7 +271,7 @@ export class AiConversationService {
       this.#store.transitionJob(job.id, "planning");
       this.#emit(job.id, { type: "status", status: "planning" });
       this.#activity(job.id, "planning", `${job.provider}가 WorkOS 규칙과 필요한 근거를 읽고 사전계획을 작성합니다.`);
-      const plan = await this.#provider.plan({
+      const planOutcome = await this.#provider.plan({
         provider: job.provider,
         model: job.model,
         reasoningEffort: job.reasoningEffort,
@@ -272,6 +281,9 @@ export class AiConversationService {
         signal: controller.signal,
         onProgress: this.#providerProgress(job.id),
       });
+      const planCompletion = requireCompletion(planOutcome, job.provider);
+      const plan = planCompletion.value;
+      this.#activity(job.id, "validation", completionSummary(planCompletion.evidence));
       if (plan.mode === "observe") {
         const answer = plan.reply || "WorkOS를 확인했지만 답변을 만들지 못했습니다.";
         this.#store.transitionJob(job.id, "succeeded", { plan, content: answer, error: null });
@@ -326,7 +338,7 @@ export class AiConversationService {
       this.#emit(job.id, { type: "status", status: "executing" });
       this.#activity(job.id, "editing", `${job.provider}가 승인된 범위 안에서 실제 WorkOS를 수정합니다.`);
       providerStarted = true;
-      const result = await this.#provider.execute({
+      const resultOutcome = await this.#provider.execute({
         provider: job.provider,
         model: job.model,
         reasoningEffort: job.reasoningEffort,
@@ -337,6 +349,9 @@ export class AiConversationService {
         signal: controller.signal,
         onProgress: this.#providerProgress(job.id),
       });
+      const resultCompletion = requireCompletion(resultOutcome, job.provider);
+      const result = resultCompletion.value;
+      this.#activity(job.id, "validation", completionSummary(resultCompletion.evidence));
       const changedPaths = this.#workspace.changedPaths(configuration.rootPath);
       if (changedPaths.length === 0) {
         this.#store.transitionJob(job.id, "succeeded", {
@@ -463,7 +478,9 @@ export class AiConversationService {
   #fail(job: AiJob, message: string): void {
     const current = this.#store.getAiJob(job.id);
     if (!current || terminal(current.status)) return;
-    this.#store.transitionJob(job.id, controllerCancelled(this.#controllers.get(job.id)) ? "cancelled" : "failed", {
+    const ownerCancelled = controllerCancelled(this.#controllers.get(job.id))
+      || (message === OWNER_CANCELLED_MESSAGE);
+    this.#store.transitionJob(job.id, ownerCancelled ? "cancelled" : "failed", {
       content: message,
       error: message,
     });
@@ -516,6 +533,50 @@ function phaseSummary(phase: ProviderPhase): string {
 }
 
 function safeError(error: unknown): string {
+  if (error instanceof ProviderOutcomeError) return outcomeMessage(error.outcome);
   if (error instanceof Error && error.message) return error.message;
   return "AI 요청을 완료하지 못했습니다.";
+}
+
+const OWNER_CANCELLED_MESSAGE = "AI request was cancelled by the owner";
+
+class ProviderOutcomeError extends Error {
+  readonly outcome: Exclude<ProviderRunOutcome<unknown>, { kind: "completed" }>;
+
+  constructor(outcome: Exclude<ProviderRunOutcome<unknown>, { kind: "completed" }>) {
+    super(outcomeMessage(outcome));
+    this.name = "ProviderOutcomeError";
+    this.outcome = outcome;
+  }
+}
+
+function requireCompletion<T>(
+  outcome: ProviderRunOutcome<T>,
+  expectedProvider: AiProviderId,
+): Extract<ProviderRunOutcome<T>, { kind: "completed" }> {
+  if (outcome.kind === "completed") {
+    if (outcome.evidence.provider !== expectedProvider) {
+      throw new ProviderOutcomeError({ kind: "failed", reason: "invalid_output" });
+    }
+    return outcome;
+  }
+  throw new ProviderOutcomeError(outcome);
+}
+
+function outcomeMessage(outcome: Exclude<ProviderRunOutcome<unknown>, { kind: "completed" }>): string {
+  if (outcome.kind === "cancelled") {
+    return outcome.source === "owner"
+      ? OWNER_CANCELLED_MESSAGE
+      : "AI provider cancelled before authoritative completion";
+  }
+  if (outcome.kind === "incomplete") {
+    return `AI provider did not produce an authoritative final artifact (${outcome.reason})`;
+  }
+  return `AI provider could not complete the request (${outcome.reason})`;
+}
+
+function completionSummary(evidence: ProviderCompletionEvidence): string {
+  return evidence.provider === "codex"
+    ? "Codex 정상 종료와 provider-owned final artifact를 확인했습니다."
+    : "Grok EndTurn과 provider-owned final artifact를 확인했습니다.";
 }

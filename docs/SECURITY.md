@@ -45,7 +45,7 @@ The provider must not commit, push, pull, or change remotes. The application alo
 
 Only official subscription-authenticated Codex and Grok CLIs are allowed. The application never reads or transports their tokens. Raw stderr, environment dumps, hidden reasoning, and provider thread IDs do not reach the browser.
 
-Provider progress is reduced inside the adapter to server-defined phase names. Event bodies, partial answers, tool arguments, commands, paths, hidden reasoning, raw stderr, and provider session identifiers are not stored or sent to the browser. Private tailnet access does not make trace or secret-bearing output safe.
+Provider progress is reduced inside the adapter to server-defined phase names and process/liveness facts. Provider bodies, partial answers, tool arguments, commands, paths, hidden reasoning, raw stderr, metadata, and session/request identifiers are discarded in memory and are not stored or sent to the browser. Private tailnet access does not make trace or secret-bearing output safe.
 
 SQLite may contain the local WorkOS path and conversation text. It stays under ignored local runtime storage and must never be committed. WorkOS content is not copied into the runtime database.
 
@@ -58,7 +58,8 @@ Fastify binds to localhost. Remote browser access uses the owner-only tailnet th
 ## Failure behavior
 
 - unavailable AI reports a durable failure rather than fabricated completion;
-- missing terminal completion, max-turn exhaustion, and unterminated progress-only streams fail instead of becoming completed messages;
+- exit zero, process exit, text position, progress, liveness, and SSE termination never prove completion;
+- missing normal terminal completion, missing final artifacts, provider cancellation, timeout, max-turn/max-token exhaustion, malformed output, and unknown terminal reasons fail instead of becoming completed messages, regardless of any response text;
 - dirty WorkOS blocks mutation;
 - malformed plans/results fail closed;
 - unexpected or residual edits enter `needs_review`;

@@ -1,5 +1,12 @@
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 
 import { assistantProfilePrompt, type AssistantProfile } from "../domain/assistant-profile.js";
@@ -12,7 +19,6 @@ import {
   type WorkspaceExecutionResult,
   type WorkspaceTurnPlan,
 } from "../domain/workspace.js";
-import { AiChatError } from "./chat-service.js";
 
 export interface WorkspaceProviderInput {
   provider: AiProviderId;
@@ -37,16 +43,54 @@ export interface WorkspaceExecutionInput extends WorkspaceProviderInput {
 }
 
 export interface WorkspaceProvider {
-  answer(input: WorkspaceProviderInput): Promise<string>;
-  plan(input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan>;
-  execute(input: WorkspaceExecutionInput): Promise<WorkspaceExecutionResult>;
+  answer(input: WorkspaceProviderInput): Promise<ProviderRunOutcome<string>>;
+  plan(input: WorkspaceProviderInput): Promise<ProviderRunOutcome<WorkspaceTurnPlan>>;
+  execute(input: WorkspaceExecutionInput): Promise<ProviderRunOutcome<WorkspaceExecutionResult>>;
 }
 
-interface Invocation {
+export interface ProviderCompletionEvidence {
+  provider: AiProviderId;
+  protocol: "codex-jsonl-final-file" | "grok-json";
+  terminalReason: "end_turn";
+  artifact: "output-last-message" | "json-object";
+}
+
+export type IncompleteReason =
+  | "max_turns"
+  | "max_tokens"
+  | "missing_completion"
+  | "missing_final"
+  | "empty_final"
+  | "artifact_too_large"
+  | "malformed_final"
+  | "unknown_terminal";
+
+export type ProviderFailureReason =
+  | "invalid_output"
+  | "nonzero_exit"
+  | "timeout"
+  | "unavailable";
+
+export type ProviderRunOutcome<T> =
+  | { kind: "completed"; value: T; evidence: ProviderCompletionEvidence }
+  | { kind: "cancelled"; source: "owner" | "provider" }
+  | { kind: "incomplete"; reason: IncompleteReason }
+  | { kind: "failed"; reason: ProviderFailureReason };
+
+export interface Invocation {
   command: AiProviderId;
   args: string[];
   stdin: string | null;
 }
+
+interface ProcessOutcome {
+  kind: "completed" | "cancelled" | "failed";
+  stdout?: string;
+  source?: "owner";
+  reason?: ProviderFailureReason;
+}
+
+const MAX_PROVIDER_BYTES = 1024 * 1024;
 
 export class CliWorkspaceProvider implements WorkspaceProvider {
   readonly #runtimeDir: string;
@@ -65,13 +109,13 @@ export class CliWorkspaceProvider implements WorkspaceProvider {
     });
   }
 
-  async answer(input: WorkspaceProviderInput): Promise<string> {
+  async answer(input: WorkspaceProviderInput): Promise<ProviderRunOutcome<string>> {
     const invocation = buildDirectInvocation(input);
-    const output = await runInvocation(invocation, input.rootPath, input.signal, input.provider, input.onProgress);
-    return parseDirectProviderText(input.provider, output);
+    return this.#run(input, invocation, (provider, output, finalArtifact) =>
+      parseDirectProviderOutcome(provider, output, finalArtifact));
   }
 
-  async plan(input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
+  async plan(input: WorkspaceProviderInput): Promise<ProviderRunOutcome<WorkspaceTurnPlan>> {
     const prompt = buildPlanningPrompt(input.profile, input.message);
     const invocation = buildInvocation({
       ...input,
@@ -81,11 +125,13 @@ export class CliWorkspaceProvider implements WorkspaceProvider {
       schema: WORKSPACE_PLAN_SCHEMA,
       capabilities: [],
     });
-    const output = await runInvocation(invocation, input.rootPath, input.signal, input.provider, input.onProgress);
-    return parseWorkspacePlan(parseProviderJson(input.provider, output));
+    return this.#run(input, invocation, (provider, output, finalArtifact) => {
+      const artifact = parseStructuredProviderOutcome(provider, output, finalArtifact);
+      return mapCompleted(artifact, (value) => parseWorkspacePlan(value));
+    });
   }
 
-  async execute(input: WorkspaceExecutionInput): Promise<WorkspaceExecutionResult> {
+  async execute(input: WorkspaceExecutionInput): Promise<ProviderRunOutcome<WorkspaceExecutionResult>> {
     const prompt = buildExecutionPrompt(input.profile, input.message, input.plan);
     const invocation = buildInvocation({
       ...input,
@@ -95,8 +141,49 @@ export class CliWorkspaceProvider implements WorkspaceProvider {
       schema: WORKSPACE_EXECUTION_SCHEMA,
       capabilities: input.plan.capabilities,
     });
-    const output = await runInvocation(invocation, input.rootPath, input.signal, input.provider, input.onProgress);
-    return parseWorkspaceExecution(parseProviderJson(input.provider, output));
+    return this.#run(input, invocation, (provider, output, finalArtifact) => {
+      const artifact = parseStructuredProviderOutcome(provider, output, finalArtifact);
+      return mapCompleted(artifact, (value) => parseWorkspaceExecution(value));
+    });
+  }
+
+  async #run<T>(
+    input: WorkspaceProviderInput,
+    invocation: Invocation,
+    parse: (provider: AiProviderId, output: string, finalArtifact: string | null) => ProviderRunOutcome<T>,
+  ): Promise<ProviderRunOutcome<T>> {
+    const temporaryDirectory = mkdtempSync(join(this.#runtimeDir, "provider-run-"));
+    const finalArtifactPath = join(temporaryDirectory, "final.txt");
+    const effectiveInvocation = input.provider === "codex"
+      ? {
+          ...invocation,
+          args: addCodexFinalArtifact(invocation.args, finalArtifactPath),
+        }
+      : invocation;
+    try {
+      const process = await runInvocation(
+        effectiveInvocation,
+        input.rootPath,
+        input.signal,
+        input.provider,
+        input.onProgress,
+      );
+      if (process.kind === "cancelled") return { kind: "cancelled", source: "owner" };
+      if (process.kind === "failed") return { kind: "failed", reason: process.reason ?? "invalid_output" };
+      let finalArtifact: string | null = null;
+      if (input.provider === "codex") {
+        const inspected = inspectFinalArtifact(finalArtifactPath);
+        if (inspected.kind !== "completed") return inspected;
+        finalArtifact = inspected.value;
+      }
+      try {
+        return parse(input.provider, process.stdout ?? "", finalArtifact);
+      } catch {
+        return { kind: "failed", reason: "invalid_output" };
+      }
+    } finally {
+      rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
   }
 }
 
@@ -130,7 +217,7 @@ export function buildDirectInvocation(input: WorkspaceProviderInput): Invocation
   const args = [
     "--no-auto-update",
     "--output-format",
-    "streaming-json",
+    "json",
     "--cwd",
     input.rootPath,
     "--max-turns",
@@ -215,87 +302,133 @@ export function buildInvocation(input: WorkspaceProviderInput & {
   return { command: "grok", args, stdin: null };
 }
 
-export function parseDirectProviderText(provider: AiProviderId, output: string): string {
-  try {
-    if (provider === "grok") {
-      const segments: string[] = [];
-      let current = "";
-      let completed = false;
-      for (const line of output.split(/\r?\n/u)) {
-        if (!line.trim()) continue;
-        const event = JSON.parse(line) as unknown;
-        if (!isRecord(event) || typeof event.type !== "string") {
-          throw new Error("invalid Grok stream event");
-        }
-        if (completed) {
-          const finalText = segments.at(-1);
-          if (!finalText || !isCompatibleGrokTerminalEnvelope(event, finalText)) {
-            throw new Error("Grok emitted output after completion");
-          }
-          continue;
-        }
-        if (event.type === "text") {
-          if (typeof event.data !== "string") throw new Error("invalid Grok text event");
-          current += event.data;
-          continue;
-        }
-        if (current.trim()) {
-          segments.push(current);
-          current = "";
-        }
-        if (event.type === "end") {
-          if (!["EndTurn", "Cancelled"].includes(String(event.stopReason))) {
-            throw new Error("Grok turn did not complete");
-          }
-          completed = true;
-        }
-      }
-      if (!completed) throw new Error("missing Grok completion event");
-      const finalText = segments.at(-1);
-      if (!finalText?.trim()) throw new Error("missing Grok response text");
-      return finalText;
+export function parseDirectProviderOutcome(
+  provider: AiProviderId,
+  output: string,
+  finalArtifact: string | null = null,
+): ProviderRunOutcome<string> {
+  if (provider === "codex") {
+    const terminal = parseCodexTerminal(output);
+    if (terminal.kind !== "completed") return terminal;
+    if (!finalArtifact?.trim()) return { kind: "incomplete", reason: "empty_final" };
+    return {
+      kind: "completed",
+      value: finalArtifact,
+      evidence: codexEvidence(),
+    };
+  }
+  const artifact = parseGrokArtifact(output);
+  if (artifact.kind !== "completed") return artifact;
+  const finalText = grokFinalText(artifact.value);
+  if (finalText === null) return { kind: "incomplete", reason: "empty_final" };
+  return {
+    kind: "completed",
+    value: finalText,
+    evidence: grokEvidence(),
+  };
+}
+
+export function parseStructuredProviderOutcome(
+  provider: AiProviderId,
+  output: string,
+  finalArtifact: string | null = null,
+): ProviderRunOutcome<unknown> {
+  if (provider === "codex") {
+    const terminal = parseCodexTerminal(output);
+    if (terminal.kind !== "completed") return terminal;
+    if (!finalArtifact?.trim()) return { kind: "incomplete", reason: "empty_final" };
+    try {
+      return {
+        kind: "completed",
+        value: parseFirstJsonObject(finalArtifact),
+        evidence: codexEvidence(),
+      };
+    } catch {
+      return { kind: "incomplete", reason: "malformed_final" };
     }
-    let finalText: string | null = null;
-    let completed = false;
+  }
+  const artifact = parseGrokArtifact(output);
+  if (artifact.kind !== "completed") return artifact;
+  const structured = artifact.value.structuredOutput;
+  const text = artifact.value.text;
+  try {
+    const value = structured !== undefined && structured !== null
+      ? (typeof structured === "string" ? parseFirstJsonObject(structured) : structured)
+      : (typeof text === "string" && text.trim() ? parseFirstJsonObject(text) : null);
+    if (value === null) return { kind: "incomplete", reason: "empty_final" };
+    return { kind: "completed", value, evidence: grokEvidence() };
+  } catch {
+    return { kind: "incomplete", reason: "malformed_final" };
+  }
+}
+
+function parseCodexTerminal(output: string): ProviderRunOutcome<null> {
+  let completed = false;
+  try {
     for (const line of output.split(/\r?\n/u)) {
       if (!line.trim()) continue;
       const event = JSON.parse(line) as unknown;
       if (!isRecord(event) || typeof event.type !== "string") {
-        throw new Error("invalid Codex stream event");
+        return { kind: "incomplete", reason: "malformed_final" };
       }
-      if (completed) throw new Error("Codex emitted output after completion");
-      if (
-        event.type === "item.completed"
-        && isRecord(event.item)
-        && event.item.type === "agent_message"
-        && typeof event.item.text === "string"
-      ) {
-        finalText = event.item.text;
-      } else if (event.type === "turn.completed") {
-        completed = true;
-      } else if (event.type === "turn.failed") {
-        throw new Error("Codex turn failed");
-      }
+      if (event.type === "turn.completed") completed = true;
+      if (event.type === "turn.failed") return { kind: "failed", reason: "invalid_output" };
     }
-    if (!completed || !finalText?.trim()) throw new Error("missing completed Codex response text");
-    return finalText;
   } catch {
-    throw new AiChatError("AI provider returned no usable answer", 502);
+    return { kind: "incomplete", reason: "malformed_final" };
+  }
+  return completed
+    ? { kind: "completed", value: null, evidence: codexEvidence() }
+    : { kind: "incomplete", reason: "missing_completion" };
+}
+
+function parseGrokArtifact(output: string): ProviderRunOutcome<Record<string, unknown>> {
+  let artifact: unknown;
+  try {
+    artifact = JSON.parse(output);
+  } catch {
+    return { kind: "incomplete", reason: "malformed_final" };
+  }
+  if (!isRecord(artifact)) return { kind: "incomplete", reason: "malformed_final" };
+  const reason = artifact.stopReason;
+  if (reason === "Cancelled") return { kind: "cancelled", source: "provider" };
+  if (reason === "MaxTurns") return { kind: "incomplete", reason: "max_turns" };
+  if (reason === "MaxTokens") return { kind: "incomplete", reason: "max_tokens" };
+  if (reason === undefined || reason === null || reason === "") {
+    return { kind: "incomplete", reason: "missing_completion" };
+  }
+  if (reason !== "EndTurn") return { kind: "incomplete", reason: "unknown_terminal" };
+  const text = artifact.text;
+  const structured = artifact.structuredOutput;
+  const hasText = typeof text === "string" && text.trim().length > 0;
+  const hasStructured = validStructuredArtifact(structured);
+  if (!hasText && !hasStructured) return { kind: "incomplete", reason: "missing_final" };
+  return { kind: "completed", value: artifact, evidence: grokEvidence() };
+}
+
+function validStructuredArtifact(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === "string") {
+    if (!value.trim()) return false;
+    try {
+      JSON.parse(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  try {
+    return JSON.stringify(value) !== undefined;
+  } catch {
+    return false;
   }
 }
 
-function isCompatibleGrokTerminalEnvelope(
-  event: Record<string, unknown>,
-  finalText: string,
-): boolean {
-  if (event.type === "usage") {
-    return event.data === undefined && event.text === undefined && event.result === undefined;
-  }
-  if (event.type !== "result") return false;
-  for (const value of [event.data, event.text, event.result]) {
-    if (value !== undefined && value !== finalText) return false;
-  }
-  return true;
+function grokFinalText(artifact: Record<string, unknown>): string | null {
+  if (typeof artifact.text === "string" && artifact.text.trim()) return artifact.text;
+  const structured = artifact.structuredOutput;
+  if (!validStructuredArtifact(structured)) return null;
+  return typeof structured === "string" ? structured : JSON.stringify(structured);
 }
 
 function buildPlanningPrompt(profile: AssistantProfile, message: string): string {
@@ -347,7 +480,7 @@ function runInvocation(
   signal: AbortSignal,
   provider: AiProviderId,
   onProgress?: (event: ProviderProgressEvent) => void,
-): Promise<string> {
+): Promise<ProcessOutcome> {
   return new Promise((resolve, reject) => {
     const child = spawn(invocation.command, invocation.args, {
       cwd,
@@ -358,23 +491,23 @@ function runInvocation(
     const stdout: Buffer[] = [];
     const progressParser = createProviderProgressParser(provider, onProgress);
     let captured = 0;
-    let error: AiChatError | null = null;
+    let error: ProviderFailureReason | "cancelled" | null = null;
     let settled = false;
-    const stop = (next: AiChatError): void => {
+    const stop = (next: ProviderFailureReason | "cancelled"): void => {
       if (error) return;
       error = next;
       child.kill();
     };
-    const timer = setTimeout(() => stop(new AiChatError("AI provider timed out", 504)), 300_000);
-    const onAbort = (): void => stop(new AiChatError("AI request was cancelled", 499));
+    const timer = setTimeout(() => stop("timeout"), 300_000);
+    const onAbort = (): void => stop("cancelled");
     signal.addEventListener("abort", onAbort, { once: true });
     const capture = (chunk: Buffer, keep: boolean): void => {
       captured += chunk.length;
-      if (captured > 1024 * 1024) {
-        stop(new AiChatError("AI provider output exceeded the safe limit", 502));
+      if (captured > MAX_PROVIDER_BYTES) {
+        stop("invalid_output");
       } else if (keep) {
         stdout.push(chunk);
-        progressParser.push(chunk);
+        if (provider === "codex") progressParser.push(chunk);
       }
     };
     child.stdout.on("data", (chunk: Buffer) => capture(chunk, true));
@@ -384,7 +517,7 @@ function runInvocation(
       signal.removeEventListener("abort", onAbort);
       if (!settled) {
         settled = true;
-        reject(new AiChatError("Selected AI provider is unavailable", 503));
+        resolve({ kind: "failed", reason: "unavailable" });
       }
     });
     child.once("close", (code) => {
@@ -394,14 +527,65 @@ function runInvocation(
       settled = true;
       progressParser.finish();
       onProgress?.({ type: "stopped", at: new Date().toISOString() });
-      if (error) return reject(error);
-      if (code !== 0) return reject(new AiChatError("AI provider could not complete the request", 502));
-      resolve(Buffer.concat(stdout).toString("utf8"));
+      if (error === "cancelled") return resolve({ kind: "cancelled", source: "owner" });
+      if (error) return resolve({ kind: "failed", reason: error });
+      if (code !== 0) return resolve({ kind: "failed", reason: "nonzero_exit" });
+      resolve({ kind: "completed", stdout: Buffer.concat(stdout).toString("utf8") });
     });
     if (invocation.stdin === null) child.stdin.end();
     else child.stdin.end(invocation.stdin, "utf8");
     onProgress?.({ type: "started", at: new Date().toISOString() });
   });
+}
+
+function addCodexFinalArtifact(args: string[], finalArtifactPath: string): string[] {
+  const promptIndex = args.lastIndexOf("-");
+  const insertion = ["--output-last-message", finalArtifactPath];
+  if (promptIndex < 0) return [...args, ...insertion];
+  return [...args.slice(0, promptIndex), ...insertion, ...args.slice(promptIndex)];
+}
+
+export function inspectFinalArtifact(path: string): ProviderRunOutcome<string> {
+  try {
+    const stat = statSync(path);
+    if (!stat.isFile()) return { kind: "incomplete", reason: "missing_final" };
+    if (stat.size > MAX_PROVIDER_BYTES) return { kind: "incomplete", reason: "artifact_too_large" };
+    const value = readFileSync(path, "utf8");
+    if (!value.trim()) return { kind: "incomplete", reason: "empty_final" };
+    return { kind: "completed", value, evidence: codexEvidence() };
+  } catch {
+    return { kind: "incomplete", reason: "missing_final" };
+  }
+}
+
+function mapCompleted<T, U>(
+  outcome: ProviderRunOutcome<T>,
+  map: (value: T) => U,
+): ProviderRunOutcome<U> {
+  if (outcome.kind !== "completed") return outcome;
+  try {
+    return { kind: "completed", value: map(outcome.value), evidence: outcome.evidence };
+  } catch {
+    return { kind: "failed", reason: "invalid_output" };
+  }
+}
+
+function codexEvidence(): ProviderCompletionEvidence {
+  return {
+    provider: "codex",
+    protocol: "codex-jsonl-final-file",
+    terminalReason: "end_turn",
+    artifact: "output-last-message",
+  };
+}
+
+function grokEvidence(): ProviderCompletionEvidence {
+  return {
+    provider: "grok",
+    protocol: "grok-json",
+    terminalReason: "end_turn",
+    artifact: "json-object",
+  };
 }
 
 export function createProviderProgressParser(
@@ -447,43 +631,6 @@ function safePhaseForEvent(provider: AiProviderId, event: Record<string, unknown
   if (event.type === "text") return "composing";
   if (event.type === "end" || event.type === "result") return "validating";
   return null;
-}
-
-export function parseProviderJson(provider: AiProviderId, output: string): unknown {
-  try {
-    if (provider === "grok") {
-      const result = JSON.parse(output) as unknown;
-      if (isRecord(result)) {
-        if (result.structuredOutput !== undefined && result.structuredOutput !== null) {
-          return typeof result.structuredOutput === "string"
-            ? parseFirstJsonObject(result.structuredOutput)
-            : result.structuredOutput;
-        }
-        if (typeof result.text === "string") {
-          return parseFirstJsonObject(result.text);
-        }
-      }
-      return result;
-    }
-    let finalText: string | null = null;
-    for (const line of output.split(/\r?\n/u)) {
-      if (!line.trim()) continue;
-      const event = JSON.parse(line) as unknown;
-      if (
-        isRecord(event)
-        && event.type === "item.completed"
-        && isRecord(event.item)
-        && event.item.type === "agent_message"
-        && typeof event.item.text === "string"
-      ) {
-        finalText = event.item.text;
-      }
-    }
-    if (!finalText) throw new Error("missing structured result");
-    return parseFirstJsonObject(finalText);
-  } catch {
-    throw new AiChatError("AI provider returned an invalid structured result", 502);
-  }
 }
 
 function parseFirstJsonObject(value: string): unknown {

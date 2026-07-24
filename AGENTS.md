@@ -40,14 +40,18 @@ Read `docs/PRODUCT_OVERVIEW.md`, `docs/PROJECT_BRIEF.md`, `docs/ARCHITECTURE.md`
 - Disable web search, MCP/apps, subagents, and external reviewer capabilities by default. Enable only the explicitly approved capability for the current turn.
 - Do not copy, print, transmit, or manipulate CLI credentials.
 - Preserve durable job states, cancellation, timeouts, bounded output, restart recovery, and provider concurrency limits.
-- Do not expose chain-of-thought, raw stderr, credentials, or provider thread IDs.
-- Hidden tool traces may be shown to the owner through the private tailnet browser surface. Trace output remains untrusted and must not include credentials, tokens, raw stderr, or environment dumps.
+- Exit code zero, process exit, the last text segment, progress, liveness, or SSE termination is not completion evidence.
+- Success requires both the provider's documented normal terminal reason and a provider-owned final artifact. Cancellation, timeout, and turn or token limits cannot be reclassified as success merely because response text exists.
+- Preserve provider lifecycle meaning in a discriminated outcome until deterministic application code has authorized the corresponding job transition; do not reduce provider outcomes to strings first.
+- Do not expose chain-of-thought, provider body fragments, tool arguments, commands, paths, raw stderr, credentials, provider identifiers, or session/request IDs. Browser progress is limited to server-defined safe phases and process/liveness facts.
 
 ## Engineering rules
 
 - Use Node.js 24+, TypeScript, Fastify, Node’s built-in SQLite, and a dependency-light browser UI unless an accepted decision changes the stack.
 - Validate every server-boundary input and every agent-produced plan/result.
 - Keep provider behavior behind adapters and Git mutation rules in deterministic application code.
+- Do not promote undocumented provider behavior into a compatibility contract from a single reproduction. A terminal-semantics change requires official documentation or a current-CLI synthetic WorkOS probe, negative fixtures, state-transition tests, and repeated-run verification.
+- Passing tests that merely encode an assumed event grammar does not validate a provider contract.
 - Serialize conflicting mutations and make retries idempotent.
 - Runtime reset may clear only application-owned SQLite state. It must never touch WorkOS files, Git history, Obsidian Sync, CLI credentials, environment configuration, or Tailscale state.
 - Keep secrets, personal data, WorkOS contents, machine paths, private hostnames, databases, logs, and browser artifacts out of the repository.
