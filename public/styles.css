@@ -19,7 +19,13 @@
 html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper); color: var(--ink); }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
-.app-shell { height: 100dvh; display: grid; grid-template-columns: 216px minmax(0, 1fr) 318px; }
+.app-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr) 318px;
+}
 
 .rail {
   background: #142019; color: #f8f5ec; padding: 24px 16px; display: flex; flex-direction: column;
@@ -36,7 +42,15 @@ button { cursor: pointer; }
 .workspace-pill i { width: 8px; height: 8px; background: #8f9c94; border-radius: 50%; }
 .workspace-pill.connected i { background: #63b482; box-shadow: 0 0 0 4px rgb(99 180 130 / 14%); }
 
-.main { min-width: 0; display: grid; grid-template-rows: 76px minmax(0, 1fr) auto; background: #fbfaf6; }
+.main {
+  min-width: 0;
+  min-height: 0;
+  height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 76px minmax(0, 1fr) auto;
+  background: #fbfaf6;
+}
 .topbar { border-bottom: 1px solid var(--line); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; background: rgb(255 255 255 / 78%); backdrop-filter: blur(16px); }
 .topbar-title p, .context-panel header p, .sheet header p, .diff-sheet header p { margin: 0; color: var(--gold); font-size: 10px; font-weight: 800; letter-spacing: .18em; }
 .topbar-title h1, .context-panel h2, .sheet h2, .diff-sheet h2 { margin: 3px 0 0; font: 650 22px/1.1 Georgia, serif; }
@@ -47,7 +61,14 @@ button { cursor: pointer; }
 .avatar-button, .icon-button { border: 1px solid var(--line); background: white; border-radius: 10px; min-height: 38px; padding: 0 12px; color: var(--ink); }
 #mobile-context { display: none; }
 
-.conversation { overflow: auto; overscroll-behavior: contain; }
+.conversation {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
 .conversation-inner { width: min(860px, calc(100% - 40px)); margin: 0 auto; padding: 34px 0 40px; }
 .intro-card { background: linear-gradient(140deg, #f0eee6, #fff); border: 1px solid #dedbd0; border-radius: 22px; padding: 28px; box-shadow: 0 10px 30px rgb(20 32 25 / 6%); }
 .intro-symbol { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--green); color: #f1d39b; font: 700 24px Georgia, serif; }
