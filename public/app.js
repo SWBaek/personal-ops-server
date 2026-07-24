@@ -1,4 +1,12 @@
+import DOMPurify from "/vendor/dompurify.js";
+import { marked } from "/vendor/marked.js";
+
 const $ = (selector) => document.querySelector(selector);
+const MARKDOWN_TAGS = [
+  "a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+  "hr", "li", "ol", "p", "pre", "strong", "table", "tbody", "td", "th", "thead", "tr", "ul",
+];
+const MARKDOWN_ATTRIBUTES = ["href", "title"];
 const state = {
   workspace: null,
   options: [],
@@ -242,7 +250,10 @@ function renderMessage(message) {
   meta.className = "message-meta";
   meta.textContent = message.role === "user" ? "OWNER" : `${message.provider || "AI"} · ${message.status || ""}`;
   const body = document.createElement("div");
-  body.textContent = message.content || (message.role === "assistant" ? "응답을 준비하고 있습니다…" : "");
+  body.className = "message-content";
+  const content = message.content || (message.role === "assistant" ? "응답을 준비하고 있습니다…" : "");
+  if (message.role === "assistant") renderAssistantMarkdown(body, content);
+  else body.textContent = content;
   bubble.append(meta, body);
   if (message.activity?.length) {
     const list = document.createElement("div");
@@ -266,6 +277,20 @@ function renderMessage(message) {
   }
   article.append(bubble);
   return article;
+}
+
+function renderAssistantMarkdown(container, markdown) {
+  const parsed = marked.parse(markdown, { async: false, breaks: true, gfm: true });
+  container.classList.add("markdown-body");
+  container.innerHTML = DOMPurify.sanitize(parsed, {
+    ALLOWED_TAGS: MARKDOWN_TAGS,
+    ALLOWED_ATTR: MARKDOWN_ATTRIBUTES,
+    ALLOW_DATA_ATTR: false,
+  });
+  for (const link of container.querySelectorAll("a[href]")) {
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+  }
 }
 
 function renderPlan(message) {

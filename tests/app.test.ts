@@ -77,6 +77,14 @@ test("first-run configuration validates Git and exposes only WorkOS-native APIs"
 
     const health = await app.inject({ method: "GET", url: "/api/health" });
     assert.equal(health.json().build, "workos-native-v1");
+    const markedModule = await app.inject({ method: "GET", url: "/vendor/marked.js" });
+    assert.equal(markedModule.statusCode, 200);
+    assert.match(markedModule.headers["content-type"] ?? "", /javascript/u);
+    assert.match(markedModule.body, /markdown parser/u);
+    const purifierModule = await app.inject({ method: "GET", url: "/vendor/dompurify.js" });
+    assert.equal(purifierModule.statusCode, 200);
+    assert.match(purifierModule.headers["content-type"] ?? "", /javascript/u);
+    assert.match(purifierModule.body, /createDOMPurify/u);
   } finally {
     await app.close();
     store.close();

@@ -26,6 +26,29 @@ createGitWorkspace(vault);
 const provider: WorkspaceProvider = {
   async answer(input: WorkspaceProviderInput): Promise<string> {
     await delay(80, input.signal);
+    if (input.message.includes("Markdown")) {
+      return [
+        "## 프로젝트 요약",
+        "",
+        "- 첫 번째 결과",
+        "- **중요한 결정**",
+        "",
+        "| 구분 | 상태 |",
+        "| --- | --- |",
+        "| 테스트 | 완료 |",
+        "",
+        "> 근거를 확인했습니다.",
+        "",
+        "```ts",
+        "const safe = true;",
+        "```",
+        "",
+        "[안전한 링크](https://example.com)",
+        "[위험한 링크](javascript:alert(1))",
+        "<img src=x onerror=\"window.__markdownXss = true\">",
+        "<script>window.__markdownXss = true</script>",
+      ].join("\n");
+    }
     if (input.message.includes("일정")) {
       return "합성 WorkOS에는 오늘 등록된 일정이 없습니다.";
     }

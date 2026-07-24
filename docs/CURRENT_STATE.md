@@ -11,6 +11,7 @@ The WorkOS-native first vertical slice is implemented:
 - one-call, read-only Codex and Grok answers with unmodified final text;
 - deterministic routing that defaults ambiguous requests to read-only;
 - provider-independent structured preflight plans for explicit mutations;
+- sanitized Markdown rendering for assistant messages with responsive tables and code blocks;
 - Observe, Operate, and Govern risk handling;
 - visible Govern approval and rejection;
 - direct provider execution in the configured WorkOS root;
@@ -35,6 +36,7 @@ Synthetic tests cover:
 - plan risk escalation;
 - Codex and Grok direct-answer and mutation invocation contracts;
 - raw final-answer preservation without structured result parsing;
+- Markdown headings, lists, tables, quotations, code, safe links, and hostile HTML-shaped input;
 - read-only turns with no file changes;
 - low-risk change, local commit, receipt, diff, and Undo;
 - Govern approval;

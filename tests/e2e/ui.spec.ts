@@ -54,6 +54,50 @@ test("one-call read-only answer bypasses a plan and survives reload", async ({ p
   await expect(page.locator("#messages")).toContainText("등록된 일정이 없습니다");
 });
 
+test("assistant Markdown is readable, sanitized, and contained on every viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator("#message-input").fill("Markdown <strong>응답</strong>을 보여줘");
+  await page.locator("#send-button").click();
+
+  const owner = page.locator(".message.user").last();
+  await expect(owner).toContainText("<strong>응답</strong>");
+  await expect(owner.locator("strong")).toHaveCount(0);
+  const assistant = page.locator(".message.assistant").last();
+  const markdown = assistant.locator(".markdown-body");
+  await expect(markdown.getByRole("heading", { name: "프로젝트 요약" })).toBeVisible();
+  await expect(markdown.locator("li")).toHaveCount(2);
+  await expect(markdown.locator("table")).toContainText("테스트");
+  await expect(markdown.locator("blockquote")).toContainText("근거를 확인했습니다");
+  await expect(markdown.locator("pre code")).toContainText("const safe = true");
+  await expect(markdown.getByRole("link", { name: "안전한 링크" })).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(markdown.locator("script, img, [onerror], [onclick]")).toHaveCount(0);
+  await expect(markdown.getByText("위험한 링크")).not.toHaveAttribute("href", /javascript/u);
+  expect(await page.evaluate("window.__markdownXss")).toBeUndefined();
+
+  for (const viewport of [
+    { width: 1440, height: 720 },
+    { width: 800, height: 900 },
+    { width: 390, height: 700 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const metrics = await page.evaluate<{
+      pageWidth: number;
+      viewportWidth: number;
+      codeScrollable: boolean;
+      tableContained: boolean;
+    }>(
+      "(() => { const code = document.querySelector('.markdown-body pre'); const table = document.querySelector('.markdown-body table'); return { pageWidth: document.documentElement.scrollWidth, viewportWidth: window.innerWidth, codeScrollable: code.scrollWidth >= code.clientWidth, tableContained: table.getBoundingClientRect().right <= window.innerWidth }; })()",
+    );
+    expect(metrics.pageWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+    expect(metrics.codeScrollable).toBe(true);
+    expect(metrics.tableContained).toBe(true);
+  }
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.locator(".message.assistant").last().locator("h2")).toHaveText("프로젝트 요약");
+});
+
 test("low-risk edit creates a receipt, diff, and latest-receipt Undo", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await page.locator("#message-input").fill("README를 업데이트해");
