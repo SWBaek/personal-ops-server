@@ -8,6 +8,7 @@ import test from "node:test";
 import {
   buildDirectInvocation,
   buildInvocation,
+  createProviderProgressParser,
   parseDirectProviderText,
   parseProviderJson,
 } from "../src/ai/workspace-provider.js";
@@ -261,4 +262,27 @@ test("provider parser rejects malformed or ambiguous structured output with a sa
     () => parseProviderJson("grok", "not outer JSON"),
     /AI provider returned an invalid structured result/u,
   );
+});
+
+test("progress parser handles split UTF-8 JSONL and emits only safe server phases", () => {
+  const secret = "private/경로.md";
+  const encoded = new TextEncoder().encode([
+    JSON.stringify({ type: "thought", data: `hidden reasoning ${secret}` }),
+    JSON.stringify({ type: "text", data: `answer fragment ${secret}` }),
+    JSON.stringify({ type: "end", stopReason: "EndTurn", toolArgs: { path: secret } }),
+    "",
+  ].join("\n"));
+  const events: unknown[] = [];
+  const parser = createProviderProgressParser("grok", (event) => events.push(event));
+  for (let index = 0; index < encoded.length; index += 3) {
+    parser.push(encoded.slice(index, index + 3));
+  }
+  parser.finish();
+
+  assert.deepEqual(
+    events.map((event) => (event as { type: string; phase?: string }).phase),
+    ["checking_workos", "composing", "validating"],
+  );
+  const serialized = JSON.stringify(events);
+  assert.doesNotMatch(serialized, /private|경로|reasoning|fragment|toolArgs/u);
 });

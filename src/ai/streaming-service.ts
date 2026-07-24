@@ -14,13 +14,24 @@ import {
   type OpsStore,
   type WorkspaceReceipt,
 } from "../infra/store.js";
-import type { WorkspaceProvider } from "./workspace-provider.js";
+import type { ProviderPhase, ProviderProgressEvent, WorkspaceProvider } from "./workspace-provider.js";
 
 export interface AiJobSnapshot {
   job: AiJob;
   message: AiMessage;
   activity: ActivityEvent[];
   receipt: WorkspaceReceipt | null;
+}
+
+export interface JobLiveness {
+  jobId: string;
+  lifecycleStatus: AiJob["status"];
+  processState: "starting" | "running" | "stopped";
+  phase: ProviderPhase;
+  serverTime: string;
+  startedAt: string | null;
+  lastProviderSignalAt: string | null;
+  timeoutAt: string | null;
 }
 
 export type AiJobStreamEvent =
@@ -39,6 +50,7 @@ export class AiConversationService {
   readonly #listeners = new Map<string, Set<Listener>>();
   readonly #controllers = new Map<string, AbortController>();
   readonly #providerLocks = new Set<AiProviderId>();
+  readonly #processStates = new Map<string, JobLiveness["processState"]>();
 
   constructor(store: OpsStore, provider: WorkspaceProvider, workspace = new GitWorkspace()) {
     this.#store = store;
@@ -62,6 +74,23 @@ export class AiConversationService {
       message: this.#store.getAiMessage(job.assistantMessageId)!,
       activity: this.#store.listActivity(job.id),
       receipt: this.#store.listReceipts(100).find((receipt) => receipt.jobId === job.id) ?? null,
+    };
+  }
+
+  liveness(jobId: string): JobLiveness | null {
+    const job = this.#store.getAiJob(jobId);
+    if (!job) return null;
+    return {
+      jobId: job.id,
+      lifecycleStatus: job.status,
+      processState: terminal(job.status) ? "stopped" : (this.#processStates.get(job.id) ?? "starting"),
+      phase: job.currentPhase,
+      serverTime: new Date().toISOString(),
+      startedAt: job.providerStartedAt,
+      lastProviderSignalAt: job.lastProviderSignalAt,
+      timeoutAt: job.providerStartedAt
+        ? new Date(Date.parse(job.providerStartedAt) + 300_000).toISOString()
+        : null,
     };
   }
 
@@ -196,6 +225,7 @@ export class AiConversationService {
         message: userMessage.content,
         profile: this.#store.getAssistantProfile(),
         signal: controller.signal,
+        onProgress: this.#providerProgress(job.id),
       });
       this.#store.transitionJob(job.id, "succeeded", {
         plan: null,
@@ -240,6 +270,7 @@ export class AiConversationService {
         message: userMessage.content,
         profile: this.#store.getAssistantProfile(),
         signal: controller.signal,
+        onProgress: this.#providerProgress(job.id),
       });
       if (plan.mode === "observe") {
         const answer = plan.reply || "WorkOS를 확인했지만 답변을 만들지 못했습니다.";
@@ -304,6 +335,7 @@ export class AiConversationService {
         profile: this.#store.getAssistantProfile(),
         plan: job.plan,
         signal: controller.signal,
+        onProgress: this.#providerProgress(job.id),
       });
       const changedPaths = this.#workspace.changedPaths(configuration.rootPath);
       if (changedPaths.length === 0) {
@@ -332,6 +364,7 @@ export class AiConversationService {
       }
       this.#activity(job.id, "validation", result.validation.join(" · ") || "변경 파일 검증을 완료했습니다.");
       const receiptId = randomUUID();
+      this.#setPhase(job.id, "committing");
       const afterCommit = this.#workspace.commit(
         configuration.rootPath,
         changedPaths,
@@ -396,6 +429,37 @@ export class AiConversationService {
     this.#emit(jobId, { type: "activity", activity });
   }
 
+  #providerProgress(jobId: string): (event: ProviderProgressEvent) => void {
+    return (event) => {
+      if (event.type === "started") {
+        this.#processStates.set(jobId, "running");
+        this.#store.updateProviderProgress(jobId, {
+          providerStartedAt: event.at,
+          lastProviderSignalAt: event.at,
+          currentPhase: "starting",
+        });
+        return;
+      }
+      if (event.type === "stopped") {
+        this.#processStates.set(jobId, "stopped");
+        return;
+      }
+      const result = this.#store.updateProviderProgress(jobId, {
+        lastProviderSignalAt: event.at,
+        currentPhase: event.phase,
+      });
+      if (result.phaseChanged) this.#activity(jobId, phaseKind(event.phase), phaseSummary(event.phase));
+    };
+  }
+
+  #setPhase(jobId: string, phase: ProviderPhase): void {
+    const result = this.#store.updateProviderProgress(jobId, {
+      lastProviderSignalAt: new Date().toISOString(),
+      currentPhase: phase,
+    });
+    if (result.phaseChanged) this.#activity(jobId, phaseKind(phase), phaseSummary(phase));
+  }
+
   #fail(job: AiJob, message: string): void {
     const current = this.#store.getAiJob(job.id);
     if (!current || terminal(current.status)) return;
@@ -433,6 +497,22 @@ function terminal(status: AiJob["status"]): boolean {
 
 function controllerCancelled(controller: AbortController | undefined): boolean {
   return controller?.signal.aborted ?? false;
+}
+
+function phaseKind(phase: ProviderPhase): ActivityEvent["kind"] {
+  if (phase === "checking_workos") return "reading";
+  if (phase === "committing") return "git";
+  return "validation";
+}
+
+function phaseSummary(phase: ProviderPhase): string {
+  return {
+    starting: "CLI 프로세스를 시작했습니다.",
+    checking_workos: "WorkOS 확인 단계로 전환했습니다.",
+    composing: "답변 구성 단계로 전환했습니다.",
+    validating: "결과 검증 단계로 전환했습니다.",
+    committing: "로컬 receipt commit 단계로 전환했습니다.",
+  }[phase];
 }
 
 function safeError(error: unknown): string {

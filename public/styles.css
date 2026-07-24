@@ -134,6 +134,16 @@ button { cursor: pointer; }
 .plan-card ul { margin: 8px 0; padding-left: 18px; color: #6c5730; font: 450 11px/1.65 var(--font-mono); }
 .plan-actions, .receipt-actions { display: flex; gap: 8px; margin-top: 10px; }
 .receipt-chip { margin-top: 13px; padding: 10px; background: var(--soft-green); border-radius: 10px; font: 500 11px/1.6 var(--font-mono); color: var(--green); }
+.progress-card { min-width: min(520px, 70vw); }
+.progress-card > strong { display: block; color: var(--green); font-size: 16px; }
+.progress-phase { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.progress-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin: 16px 0 0; }
+.progress-card dl > * { margin: 0; }
+.progress-card dt { color: var(--muted); font-size: 10px; }
+.progress-card dd { margin-top: 2px; font: 500 12px/1.5 var(--font-mono); color: var(--ink); }
+.run-details { margin-top: 13px; border-top: 1px solid var(--line); padding-top: 10px; color: var(--muted); font-size: 11px; }
+.run-details summary { cursor: pointer; color: var(--green-2); }
+.run-details div { margin-top: 8px; line-height: 1.65; }
 
 .composer-wrap { border-top: 1px solid var(--line); background: rgb(255 255 255 / 92%); padding: 12px 20px max(12px, env(safe-area-inset-bottom)); }
 .composer { width: min(900px, 100%); margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: end; border: 1px solid #cad1cb; border-radius: 18px; padding: 10px; background: white; box-shadow: 0 8px 30px rgb(20 32 25 / 8%); }
@@ -212,6 +222,8 @@ button { cursor: pointer; }
   .intro-card h2 { font-size: 24px; }
   .intro-grid { grid-template-columns: 1fr; }
   .message-bubble { max-width: 92%; }
+  .progress-card { min-width: 0; }
+  .progress-card dl { grid-template-columns: 1fr 1fr; }
   .composer-wrap { padding: 9px 10px max(9px, env(safe-area-inset-bottom)); }
   .composer { grid-template-columns: minmax(0, 1fr) auto; border-radius: 15px; }
   .composer-controls { overflow-x: auto; flex-wrap: nowrap; }

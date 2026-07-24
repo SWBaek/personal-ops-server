@@ -50,6 +50,8 @@ It deliberately does not store projects, tasks, events, memos, snapshots, knowle
 
 Jobs survive browser reload and interrupted jobs are reconciled at server startup.
 
+While a job is active, liveness deliberately separates the browser SSE connection, the server-managed CLI process, and the timestamp of the last parsed provider event. The adapter incrementally decodes JSONL but emits only server-defined phases. Five-second SSE liveness events are not accumulated in SQLite; only meaningful phase changes are durable activity.
+
 ## Provider boundary
 
 Both providers implement the same direct-answer, plan, and execution interfaces. Direct answers have no output schema and receive the owner’s request unchanged. Provider-specific event parsers require explicit terminal completion rather than equating the first assistant text with success. CLI arguments are arrays and use `shell: false`. The configured WorkOS root is the working directory, allowing the provider to inherit WorkOS instructions naturally.

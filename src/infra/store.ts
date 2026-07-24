@@ -10,6 +10,7 @@ import {
   type AssistantProfileDraft,
 } from "../domain/assistant-profile.js";
 import { initialModelFor } from "../domain/ai-models.js";
+import type { ProviderPhase } from "../ai/workspace-provider.js";
 import type {
   AiProviderId,
   WorkspaceConfiguration,
@@ -72,6 +73,9 @@ export interface AiJob {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  providerStartedAt: string | null;
+  lastProviderSignalAt: string | null;
+  currentPhase: ProviderPhase;
 }
 
 export interface ActivityEvent {
@@ -440,6 +444,9 @@ export class OpsStore {
       createdAt: timestamp,
       startedAt: null,
       finishedAt: null,
+      providerStartedAt: null,
+      lastProviderSignalAt: null,
+      currentPhase: "starting",
     };
     this.#db.exec("BEGIN IMMEDIATE");
     try {
@@ -477,7 +484,8 @@ export class OpsStore {
     const row = this.#db.prepare(
       `SELECT id, conversation_id, user_message_id, assistant_message_id, client_request_id,
               provider, model, reasoning_effort, status, plan_json, error,
-              created_at, started_at, finished_at
+              created_at, started_at, finished_at, provider_started_at,
+              last_provider_signal_at, current_phase
        FROM ai_jobs WHERE id = ?`,
     ).get(id) as AiJobRow | undefined;
     return row ? mapJob(row) : null;
@@ -535,6 +543,28 @@ export class OpsStore {
       throw error;
     }
     return this.getAiJob(id)!;
+  }
+
+  updateProviderProgress(
+    id: string,
+    input: { providerStartedAt?: string; lastProviderSignalAt?: string; currentPhase?: ProviderPhase },
+  ): { job: AiJob; phaseChanged: boolean } {
+    const current = this.getAiJob(id);
+    if (!current) throw new Error("AI job not found");
+    const phaseChanged = input.currentPhase !== undefined && input.currentPhase !== current.currentPhase;
+    this.#db.prepare(
+      `UPDATE ai_jobs
+       SET provider_started_at = COALESCE(?, provider_started_at),
+           last_provider_signal_at = COALESCE(?, last_provider_signal_at),
+           current_phase = COALESCE(?, current_phase)
+       WHERE id = ?`,
+    ).run(
+      input.providerStartedAt ?? null,
+      input.lastProviderSignalAt ?? null,
+      input.currentPhase ?? null,
+      id,
+    );
+    return { job: this.getAiJob(id)!, phaseChanged };
   }
 
   addActivity(jobId: string, kind: ActivityEvent["kind"], summary: string): ActivityEvent {
@@ -719,7 +749,10 @@ export class OpsStore {
         error TEXT,
         created_at TEXT NOT NULL,
         started_at TEXT,
-        finished_at TEXT
+        finished_at TEXT,
+        provider_started_at TEXT,
+        last_provider_signal_at TEXT,
+        current_phase TEXT NOT NULL DEFAULT 'starting'
       );
       CREATE TABLE IF NOT EXISTS activity_events (
         id TEXT PRIMARY KEY,
@@ -746,7 +779,7 @@ export class OpsStore {
         ON ai_messages (conversation_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_ai_jobs_status
         ON ai_jobs (status, created_at);
-      PRAGMA user_version = 1;
+      PRAGMA user_version = 3;
       COMMIT;
     `);
     }
@@ -778,6 +811,31 @@ export class OpsStore {
         PRAGMA user_version = 2;
         COMMIT;
       `);
+    }
+    const livenessVersion = Number(
+      (this.#db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version,
+    );
+    if (livenessVersion < 3) {
+      const columns = new Set(
+        (this.#db.prepare("PRAGMA table_info(ai_jobs)").all() as unknown as Array<{ name: string }>)
+          .map((column) => column.name),
+      );
+      this.#db.exec("BEGIN IMMEDIATE");
+      try {
+        if (!columns.has("provider_started_at")) {
+          this.#db.exec("ALTER TABLE ai_jobs ADD COLUMN provider_started_at TEXT");
+        }
+        if (!columns.has("last_provider_signal_at")) {
+          this.#db.exec("ALTER TABLE ai_jobs ADD COLUMN last_provider_signal_at TEXT");
+        }
+        if (!columns.has("current_phase")) {
+          this.#db.exec("ALTER TABLE ai_jobs ADD COLUMN current_phase TEXT NOT NULL DEFAULT 'starting'");
+        }
+        this.#db.exec("PRAGMA user_version = 3; COMMIT");
+      } catch (error) {
+        this.#db.exec("ROLLBACK");
+        throw error;
+      }
     }
   }
 
@@ -959,6 +1017,9 @@ function mapJob(row: AiJobRow): AiJob {
     createdAt: row.created_at,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
+    providerStartedAt: row.provider_started_at,
+    lastProviderSignalAt: row.last_provider_signal_at,
+    currentPhase: row.current_phase,
   };
 }
 
@@ -1054,6 +1115,9 @@ interface AiJobRow {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  provider_started_at: string | null;
+  last_provider_signal_at: string | null;
+  current_phase: ProviderPhase;
 }
 
 interface ActivityRow {

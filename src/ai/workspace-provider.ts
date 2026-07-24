@@ -22,7 +22,15 @@ export interface WorkspaceProviderInput {
   message: string;
   profile: AssistantProfile;
   signal: AbortSignal;
+  onProgress?: (event: ProviderProgressEvent) => void;
 }
+
+export type ProviderPhase = "starting" | "checking_workos" | "composing" | "validating" | "committing";
+
+export type ProviderProgressEvent =
+  | { type: "started"; at: string }
+  | { type: "signal"; at: string; phase: ProviderPhase }
+  | { type: "stopped"; at: string };
 
 export interface WorkspaceExecutionInput extends WorkspaceProviderInput {
   plan: WorkspaceTurnPlan;
@@ -59,7 +67,7 @@ export class CliWorkspaceProvider implements WorkspaceProvider {
 
   async answer(input: WorkspaceProviderInput): Promise<string> {
     const invocation = buildDirectInvocation(input);
-    const output = await runInvocation(invocation, input.rootPath, input.signal);
+    const output = await runInvocation(invocation, input.rootPath, input.signal, input.provider, input.onProgress);
     return parseDirectProviderText(input.provider, output);
   }
 
@@ -73,7 +81,7 @@ export class CliWorkspaceProvider implements WorkspaceProvider {
       schema: WORKSPACE_PLAN_SCHEMA,
       capabilities: [],
     });
-    const output = await runInvocation(invocation, input.rootPath, input.signal);
+    const output = await runInvocation(invocation, input.rootPath, input.signal, input.provider, input.onProgress);
     return parseWorkspacePlan(parseProviderJson(input.provider, output));
   }
 
@@ -87,7 +95,7 @@ export class CliWorkspaceProvider implements WorkspaceProvider {
       schema: WORKSPACE_EXECUTION_SCHEMA,
       capabilities: input.plan.capabilities,
     });
-    const output = await runInvocation(invocation, input.rootPath, input.signal);
+    const output = await runInvocation(invocation, input.rootPath, input.signal, input.provider, input.onProgress);
     return parseWorkspaceExecution(parseProviderJson(input.provider, output));
   }
 }
@@ -315,6 +323,8 @@ function runInvocation(
   invocation: Invocation,
   cwd: string,
   signal: AbortSignal,
+  provider: AiProviderId,
+  onProgress?: (event: ProviderProgressEvent) => void,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(invocation.command, invocation.args, {
@@ -324,6 +334,7 @@ function runInvocation(
       stdio: ["pipe", "pipe", "pipe"],
     });
     const stdout: Buffer[] = [];
+    const progressParser = createProviderProgressParser(provider, onProgress);
     let captured = 0;
     let error: AiChatError | null = null;
     let settled = false;
@@ -341,6 +352,7 @@ function runInvocation(
         stop(new AiChatError("AI provider output exceeded the safe limit", 502));
       } else if (keep) {
         stdout.push(chunk);
+        progressParser.push(chunk);
       }
     };
     child.stdout.on("data", (chunk: Buffer) => capture(chunk, true));
@@ -358,13 +370,61 @@ function runInvocation(
       signal.removeEventListener("abort", onAbort);
       if (settled) return;
       settled = true;
+      progressParser.finish();
+      onProgress?.({ type: "stopped", at: new Date().toISOString() });
       if (error) return reject(error);
       if (code !== 0) return reject(new AiChatError("AI provider could not complete the request", 502));
       resolve(Buffer.concat(stdout).toString("utf8"));
     });
     if (invocation.stdin === null) child.stdin.end();
     else child.stdin.end(invocation.stdin, "utf8");
+    onProgress?.({ type: "started", at: new Date().toISOString() });
   });
+}
+
+export function createProviderProgressParser(
+  provider: AiProviderId,
+  onProgress?: (event: ProviderProgressEvent) => void,
+): { push(chunk: Uint8Array): void; finish(): void } {
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  let pending = "";
+  const inspect = (line: string): void => {
+    if (!line.trim()) return;
+    try {
+      const event = JSON.parse(line) as unknown;
+      if (!isRecord(event) || typeof event.type !== "string") return;
+      const phase = safePhaseForEvent(provider, event);
+      if (phase) onProgress?.({ type: "signal", at: new Date().toISOString(), phase });
+    } catch {
+      // Progress parsing is advisory. The terminal parser remains authoritative.
+    }
+  };
+  return {
+    push(chunk) {
+      pending += decoder.decode(chunk, { stream: true });
+      const lines = pending.split(/\r?\n/u);
+      pending = lines.pop() ?? "";
+      for (const line of lines) inspect(line);
+    },
+    finish() {
+      pending += decoder.decode();
+      inspect(pending);
+      pending = "";
+    },
+  };
+}
+
+function safePhaseForEvent(provider: AiProviderId, event: Record<string, unknown>): ProviderPhase | null {
+  if (provider === "codex") {
+    if (event.type === "thread.started" || event.type === "turn.started") return "checking_workos";
+    if (event.type === "item.started" || event.type === "item.completed") return "composing";
+    if (event.type === "turn.completed" || event.type === "turn.failed") return "validating";
+    return null;
+  }
+  if (event.type === "start" || event.type === "thought" || event.type === "tool") return "checking_workos";
+  if (event.type === "text") return "composing";
+  if (event.type === "end" || event.type === "result") return "validating";
+  return null;
 }
 
 export function parseProviderJson(provider: AiProviderId, output: string): unknown {

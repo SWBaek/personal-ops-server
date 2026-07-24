@@ -53,7 +53,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.get("/api/health", async () => ({
     ok: true,
-    build: "workos-native-v1",
+    build: "workos-liveness-v1",
     now: new Date().toISOString(),
   }));
 
@@ -61,7 +61,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     runtime: {
       environment: options.environment ?? "test",
       mode: "workos-native",
-      build: "workos-native-v1",
+      build: "workos-liveness-v1",
     },
   }));
 
@@ -213,14 +213,17 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       connection: "keep-alive",
       "x-accel-buffering": "no",
     });
+    let heartbeat: NodeJS.Timeout | null = null;
     const unsubscribe = options.aiConversationService.subscribe(request.params.id, (event) => {
       writeJobEvent(reply.raw, event);
       if (terminal(event)) {
+        if (heartbeat) clearInterval(heartbeat);
         unsubscribe();
         reply.raw.end();
       }
     });
     writeSse(reply.raw, "snapshot", publicSnapshot(snapshot));
+    writeSse(reply.raw, "liveness", options.aiConversationService.liveness(request.params.id));
     if (snapshot.job.status === "approval_required") {
       writeSse(reply.raw, "approval_required", publicSnapshot(snapshot));
       unsubscribe();
@@ -233,9 +236,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       reply.raw.end();
       return;
     }
-    const heartbeat = setInterval(() => reply.raw.write(": keep-alive\n\n"), 15_000);
+    heartbeat = setInterval(() => {
+      const liveness = options.aiConversationService.liveness(request.params.id);
+      if (liveness) writeSse(reply.raw, "liveness", liveness);
+    }, 5_000);
     request.raw.once("close", () => {
-      clearInterval(heartbeat);
+      if (heartbeat) clearInterval(heartbeat);
       unsubscribe();
     });
   });

@@ -14,6 +14,8 @@ const state = {
   messages: [],
   activeJobId: null,
   eventSource: null,
+  connectionState: "disconnected",
+  clockTimer: null,
   profile: null,
 };
 
@@ -138,6 +140,13 @@ async function loadConversation() {
   state.conversation = result.conversation;
   state.messages = result.messages;
   renderMessages();
+  const pending = state.messages.find((message) =>
+    message.role === "assistant" && message.status === "pending" && message.jobId);
+  if (pending) {
+    state.activeJobId = pending.jobId;
+    setBusy(true, "활성 작업을 다시 추적하고 있습니다.");
+    followJob(pending.jobId);
+  }
 }
 
 async function sendMessage(event) {
@@ -183,7 +192,20 @@ function followJob(jobId) {
   state.eventSource?.close();
   const source = new EventSource(`/api/ai/jobs/${jobId}/events`);
   state.eventSource = source;
+  state.connectionState = "connecting";
+  source.onopen = () => {
+    state.connectionState = "connected";
+    renderMessages();
+  };
   source.addEventListener("snapshot", (event) => applySnapshot(JSON.parse(event.data)));
+  source.addEventListener("liveness", (event) => {
+    const liveness = JSON.parse(event.data);
+    const message = state.messages.find((item) => item.jobId === jobId && item.role === "assistant");
+    if (message) {
+      message.liveness = liveness;
+      renderMessages();
+    }
+  });
   source.addEventListener("status", (event) => {
     const status = JSON.parse(event.data).status;
     composerStatus.textContent = status === "planning"
@@ -215,13 +237,23 @@ function followJob(jobId) {
   });
   source.onerror = () => {
     if (!state.activeJobId) return;
-    setTimeout(() => void loadConversation().then(() => setBusy(false)), 700);
+    state.connectionState = "recovering";
+    composerStatus.textContent = "연결 복구 중 · 서버 작업은 계속될 수 있습니다.";
+    renderMessages();
   };
+  clearInterval(state.clockTimer);
+  state.clockTimer = setInterval(renderMessages, 1_000);
 }
 
 function applySnapshot(snapshot) {
   const index = state.messages.findIndex((item) => item.id === snapshot.message.id);
-  const message = { ...snapshot.message, activity: snapshot.activity, receipt: snapshot.receipt };
+  const previous = index >= 0 ? state.messages[index] : null;
+  const message = {
+    ...snapshot.message,
+    activity: snapshot.activity,
+    receipt: snapshot.receipt,
+    liveness: previous?.liveness,
+  };
   if (index >= 0) state.messages[index] = message;
   else state.messages.push(message);
   renderMessages();
@@ -230,15 +262,19 @@ function applySnapshot(snapshot) {
 function finishFollow(success, text) {
   state.eventSource?.close();
   state.eventSource = null;
+  state.connectionState = "disconnected";
+  clearInterval(state.clockTimer);
+  state.clockTimer = null;
   state.activeJobId = null;
   setBusy(false, text);
   if (!success) toast(text);
 }
 
 function renderMessages() {
+  const stayAtBottom = conversation.scrollHeight - conversation.scrollTop - conversation.clientHeight < 80;
   intro.hidden = state.messages.length > 0;
   messages.replaceChildren(...state.messages.map(renderMessage));
-  requestAnimationFrame(() => conversation.scrollTo({ top: conversation.scrollHeight, behavior: "smooth" }));
+  if (stayAtBottom) requestAnimationFrame(() => conversation.scrollTo({ top: conversation.scrollHeight }));
 }
 
 function renderMessage(message) {
@@ -251,11 +287,13 @@ function renderMessage(message) {
   meta.textContent = message.role === "user" ? "OWNER" : `${message.provider || "AI"} · ${message.status || ""}`;
   const body = document.createElement("div");
   body.className = "message-content";
-  const content = message.content || (message.role === "assistant" ? "응답을 준비하고 있습니다…" : "");
-  if (message.role === "assistant") renderAssistantMarkdown(body, content);
+  const content = message.content || "";
+  if (message.role === "assistant" && message.status === "pending") {
+    body.append(renderProgressCard(message));
+  } else if (message.role === "assistant") renderAssistantMarkdown(body, content);
   else body.textContent = content;
   bubble.append(meta, body);
-  if (message.activity?.length) {
+  if (message.status === "pending" && message.activity?.length) {
     const list = document.createElement("div");
     list.className = "activity-list";
     for (const activity of message.activity) {
@@ -265,6 +303,16 @@ function renderMessage(message) {
       list.append(item);
     }
     bubble.append(list);
+  }
+  if (message.role === "assistant" && message.status !== "pending" && message.activity?.length) {
+    const details = document.createElement("details");
+    details.className = "run-details";
+    const summary = document.createElement("summary");
+    summary.textContent = `실행 정보 · ${formatDuration(runElapsedMs(message))}`;
+    const phases = document.createElement("div");
+    phases.textContent = message.activity.map((item) => item.summary).join(" · ");
+    details.append(summary, phases);
+    bubble.append(details);
   }
   if (message.plan && message.status === "pending" && message.plan.requiresApproval) {
     bubble.append(renderPlan(message));
@@ -277,6 +325,73 @@ function renderMessage(message) {
   }
   article.append(bubble);
   return article;
+}
+
+function renderProgressCard(message) {
+  const liveness = message.liveness;
+  const card = document.createElement("section");
+  card.className = "progress-card";
+  const title = document.createElement("strong");
+  title.textContent = livenessLabel(liveness);
+  const phase = document.createElement("div");
+  phase.className = "progress-phase";
+  phase.textContent = `현재 단계 · ${phaseLabel(liveness?.phase || "starting")}`;
+  const metrics = document.createElement("dl");
+  for (const [label, value] of [
+    ["전체 경과", formatDuration(runElapsedMs(message))],
+    ["마지막 신호", liveness?.lastProviderSignalAt
+      ? `${formatDuration(Date.now() - Date.parse(liveness.lastProviderSignalAt))} 전`
+      : "아직 없음"],
+    ["CLI 프로세스", processLabel(liveness?.processState || "starting")],
+    ["실시간 연결", state.connectionState === "connected" ? "연결됨"
+      : state.connectionState === "recovering" ? "복구 중" : "연결 중"],
+  ]) {
+    const dt = document.createElement("dt");
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.textContent = value;
+    metrics.append(dt, dd);
+  }
+  card.append(title, phase, metrics);
+  return card;
+}
+
+function livenessLabel(liveness) {
+  if (!liveness || liveness.processState === "starting") return "시작 중";
+  if (liveness.processState === "stopped") return "마무리 처리 중";
+  const silence = liveness.lastProviderSignalAt
+    ? Date.now() - Date.parse(liveness.lastProviderSignalAt)
+    : 0;
+  if (silence >= 60_000) return "응답 지연";
+  if (silence >= 15_000) return "조용히 처리 중";
+  return "실행 중";
+}
+
+function phaseLabel(phase) {
+  return {
+    starting: "시작",
+    checking_workos: "WorkOS 확인",
+    composing: "답변 구성",
+    validating: "검증",
+    committing: "커밋",
+  }[phase] || "시작";
+}
+
+function processLabel(processState) {
+  return { starting: "시작 중", running: "실행 중", stopped: "중지됨" }[processState];
+}
+
+function runElapsedMs(message) {
+  const startedAt = message.liveness?.startedAt || message.createdAt;
+  const endAt = message.updatedAt && message.status !== "pending" ? message.updatedAt : Date.now();
+  return Math.max(0, Date.parse(endAt) - Date.parse(startedAt));
+}
+
+function formatDuration(milliseconds) {
+  if (!Number.isFinite(milliseconds)) return "0초";
+  const seconds = Math.max(0, Math.floor(milliseconds / 1_000));
+  const minutes = Math.floor(seconds / 60);
+  return minutes ? `${minutes}분 ${seconds % 60}초` : `${seconds}초`;
 }
 
 function renderAssistantMarkdown(container, markdown) {
