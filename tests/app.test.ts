@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { AiConversationService } from "../src/ai/streaming-service.js";
 import type {
+  ProviderRunOutcome,
   WorkspaceExecutionInput,
   WorkspaceProvider,
   WorkspaceProviderInput,
@@ -17,12 +18,12 @@ import { OpsStore } from "../src/infra/store.js";
 import { createGitWorkspace } from "./helpers.js";
 
 class NoopProvider implements WorkspaceProvider {
-  async answer(_input: WorkspaceProviderInput): Promise<string> {
-    return "Synthetic answer";
+  async answer(input: WorkspaceProviderInput): Promise<ProviderRunOutcome<string>> {
+    return completed("Synthetic answer", input.provider);
   }
 
-  async plan(_input: WorkspaceProviderInput): Promise<WorkspaceTurnPlan> {
-    return {
+  async plan(input: WorkspaceProviderInput): Promise<ProviderRunOutcome<WorkspaceTurnPlan>> {
+    return completed({
       mode: "observe",
       summary: "Answer",
       reply: "Synthetic answer",
@@ -32,12 +33,25 @@ class NoopProvider implements WorkspaceProvider {
       capabilities: ["local"],
       rationale: "Question",
       requiresApproval: false,
-    };
+    }, input.provider);
   }
 
-  async execute(_input: WorkspaceExecutionInput): Promise<WorkspaceExecutionResult> {
+  async execute(_input: WorkspaceExecutionInput): Promise<ProviderRunOutcome<WorkspaceExecutionResult>> {
     throw new Error("not used");
   }
+}
+
+function completed<T>(value: T, provider: "codex" | "grok"): ProviderRunOutcome<T> {
+  return {
+    kind: "completed",
+    value,
+    evidence: {
+      provider,
+      protocol: provider === "codex" ? "codex-jsonl-final-file" : "grok-json",
+      terminalReason: "end_turn",
+      artifact: provider === "codex" ? "output-last-message" : "json-object",
+    },
+  };
 }
 
 test("first-run configuration validates Git and exposes only WorkOS-native APIs", async () => {
@@ -76,7 +90,7 @@ test("first-run configuration validates Git and exposes only WorkOS-native APIs"
     assert.equal((await app.inject({ method: "GET", url: "/api/debug/summary" })).statusCode, 404);
 
     const health = await app.inject({ method: "GET", url: "/api/health" });
-    assert.equal(health.json().build, "workos-chat-view-v1");
+    assert.equal(health.json().build, "provider-final-artifacts-33");
     const markedModule = await app.inject({ method: "GET", url: "/vendor/marked.js" });
     assert.equal(markedModule.statusCode, 200);
     assert.match(markedModule.headers["content-type"] ?? "", /javascript/u);

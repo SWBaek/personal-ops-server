@@ -10,9 +10,19 @@ GitHub Issue: #31.
 
 The owner may hide all completed messages currently in the timeline without deleting runtime evidence. A nullable cutoff message identifier controls browser visibility, while messages, jobs, approvals, activity, receipts, and WorkOS remain unchanged. Active work blocks a new cutoff, newly created messages remain visible, and restore clears the cutoff.
 
-## 2026-07-24 — Grok completion permits only compatible trailing envelopes
+## 2026-07-24 — Provider-owned final artifacts define completion
 
 **Status: Active**
+
+GitHub Issue: #33.
+
+Answer, plan, and execution preserve `completed`, `cancelled`, `incomplete`, and `failed` lifecycle meanings until deterministic service code chooses a state transition. Only `completed` can succeed.
+
+Codex requires exit zero, `turn.completed`, and a bounded non-empty `--output-last-message` file in a runtime-only temporary directory. Grok requires exit zero and one JSON object containing `stopReason: EndTurn` plus non-empty text or valid structured output. Provider cancellation, timeout, turn/token limits, unknown terminal reasons, progress, liveness, process exit, and response text alone are never success evidence. Grok ACP progress is outside this decision.
+
+## 2026-07-24 — Grok completion permits only compatible trailing envelopes
+
+**Status: Superseded by provider-owned final artifacts (#33)**
 
 GitHub Issue: #29.
 
@@ -22,9 +32,7 @@ Grok direct answers require a terminal `end` and a non-empty final text segment.
 
 **Status: Superseded by AI liveness signal policy below**
 
-The browser may expose otherwise hidden AI tool traces so the owner can inspect long-running work and diagnose provider behavior. This is permitted only on the authenticated owner-only private tailnet surface; it does not authorize public exposure.
-
-Tool traces remain untrusted evidence and cannot expand agent authority. Chain-of-thought, credentials, tokens, raw stderr, environment dumps, provider diagnostics, and provider session identifiers remain prohibited. This decision changes policy only; a trace UI requires a separate implementation with bounded output and secret filtering.
+This historical allowance is withdrawn. Private tailnet access does not make provider bodies or traces safe to transmit. The browser may receive only server-defined safe phases and process/liveness facts; provider text fragments, tool arguments, commands, paths, stderr, metadata, and identifiers remain inside the adapter and are discarded.
 
 ## 2026-07-24 — AI liveness uses three factual signals
 
@@ -34,11 +42,11 @@ GitHub Issue: #27.
 
 The interface reports browser/server connectivity, server-managed CLI process state, and the age of the last structured provider event separately. It does not infer percentage progress. Fifteen and sixty seconds without a provider signal produce informational quiet and delayed labels; only the existing 300-second provider timeout is a failure boundary.
 
-Provider JSONL is decoded incrementally, but event bodies never cross the adapter boundary. Only the server-defined phases starting, WorkOS checking, answer composition, validation, and local receipt commit are exposed. This decision retires the earlier allowance for hidden tool traces in the browser.
+Codex JSONL is decoded incrementally, but event bodies never cross the adapter boundary. Grok one-object JSON is not interpreted as progress. Only the server-defined phases starting, WorkOS checking, answer composition, validation, and local receipt commit plus process/liveness facts are exposed. This decision retires the earlier allowance for hidden tool traces in the browser.
 
 ## 2026-07-24 — Provider terminal events own direct-answer completion
 
-**Status: Active**
+**Status: Superseded by provider-owned final artifacts (#33)**
 
 Assistant text is not itself proof that a direct-answer turn completed. Codex must emit `turn.completed`; Grok must emit a terminal `end` event with `stopReason: EndTurn`. Missing completion, max-turn exhaustion, malformed streams, and events after completion fail the durable job.
 

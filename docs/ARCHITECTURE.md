@@ -39,7 +39,7 @@ It deliberately does not store projects, tasks, events, memos, snapshots, knowle
 1. The server validates the browser request and provider selection.
 2. It verifies that the provider has an owner grant and that the root remains valid.
 3. An ordinary or ambiguous question invokes the provider once with read-only permissions.
-4. The adapter waits for the provider’s terminal completion event, discards intermediate progress segments, and persists only the final answer text without a structured schema rewrite.
+4. The adapter preserves a discriminated provider outcome and accepts only a documented normal terminal reason paired with a provider-owned final artifact.
 5. An explicit file-changing command instead runs a structured read-only preflight.
 6. The server validates the mutation plan and deterministically escalates risk when required.
 7. Govern pauses in `approval_required`.
@@ -51,11 +51,15 @@ It deliberately does not store projects, tasks, events, memos, snapshots, knowle
 
 Jobs survive browser reload and interrupted jobs are reconciled at server startup.
 
-While a job is active, liveness deliberately separates the browser SSE connection, the server-managed CLI process, and the timestamp of the last parsed provider event. The adapter incrementally decodes JSONL but emits only server-defined phases. Five-second SSE liveness events are not accumulated in SQLite; only meaningful phase changes are durable activity.
+While a job is active, liveness deliberately separates the browser SSE connection, the server-managed CLI process, and the timestamp of the last safe provider signal. Codex JSONL is decoded incrementally only for advisory server-defined phases. Grok JSON mode exposes process-alive and elapsed/quiet facts without treating the final JSON object as a progress stream. Five-second SSE liveness events are not accumulated in SQLite; only meaningful safe phase changes are durable activity.
 
 ## Provider boundary
 
-Both providers implement the same direct-answer, plan, and execution interfaces. Direct answers have no output schema and receive the owner’s request unchanged. Provider-specific event parsers require explicit terminal completion rather than equating the first assistant text with success. CLI arguments are arrays and use `shell: false`. The configured WorkOS root is the working directory, allowing the provider to inherit WorkOS instructions naturally.
+Both providers implement the same direct-answer, plan, and execution interfaces using a discriminated `completed`, `cancelled`, `incomplete`, or `failed` outcome. Only `completed` carries a typed value and may authorize a successful job/message transition.
+
+Codex JSONL is progress telemetry, not answer content. Every Codex invocation also writes `--output-last-message` into a unique runtime-only temporary directory; success requires exit zero, `turn.completed`, and a non-empty bounded final file. Grok uses one `--output-format json` object; success requires exit zero, `stopReason: EndTurn`, and non-empty text or valid structured output. Provider `Cancelled`, max-turn/max-token exhaustion, unknown terminal reasons, missing artifacts, and malformed artifacts remain non-success even when text exists.
+
+Progress callbacks can update only liveness and safe phase labels. They cannot supply answer content or authorize completion. CLI arguments are arrays and use `shell: false`. The configured WorkOS root is the working directory, allowing the provider to inherit WorkOS instructions naturally.
 
 Web search, MCP/apps, subagents, external review, and remote Git are disabled by default. A later workflow may add a narrowly scoped capability only behind Govern approval.
 
