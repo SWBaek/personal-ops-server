@@ -30,6 +30,7 @@ The accepted product correction is simpler: use the actual WorkOS as the require
 ### Runtime
 
 - direct-answer adapters without output schemas plus common mutation plan/result schemas;
+- provider terminal-event validation so multi-step progress text cannot become a completed answer;
 - Codex read-only planning and workspace-write execution;
 - Grok planning and accepted-edit execution;
 - disabled external capabilities by default;
