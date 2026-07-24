@@ -57,6 +57,36 @@ test("one-call read-only answer bypasses a plan and survives reload", async ({ p
   await expect(page.locator("#messages")).toContainText("등록된 일정이 없습니다");
 });
 
+test("historical chat view hides, persists across reload, and restores without deleting records", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await page.locator("#message-input").fill("숨기기 전 오늘 일정은?");
+  await page.locator("#send-button").click();
+  await expect(page.locator(".message.assistant").last()).toContainText("등록된 일정이 없습니다");
+  await expect(page.locator("#send-button")).toBeEnabled();
+  const before = await page.locator("#messages .message").count();
+  expect(before).toBeGreaterThan(0);
+  await page.locator("#timeline-hide").click();
+  await expect(page.locator("#hidden-history")).toContainText(`이전 대화 ${before}개 숨김`);
+  await expect(page.locator("#messages .message")).toHaveCount(0);
+
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.locator("#hidden-history")).toContainText(`이전 대화 ${before}개 숨김`);
+  await expect(page.locator("#messages .message")).toHaveCount(0);
+
+  await page.locator("#message-input").fill("숨김 이후 오늘 일정은?");
+  await page.locator("#send-button").click();
+  await expect(page.locator("#messages .message.user")).toHaveCount(1);
+  await expect(page.locator("#messages .message.assistant")).toContainText("등록된 일정이 없습니다");
+  await page.locator("#timeline-restore").click();
+  await expect(page.locator("#hidden-history")).toBeHidden();
+  await expect(page.locator("#messages .message")).toHaveCount(before + 2);
+  const metrics = await page.evaluate<{ width: number; viewport: number }>(
+    "({ width: document.documentElement.scrollWidth, viewport: window.innerWidth })",
+  );
+  expect(metrics.width).toBeLessThanOrEqual(metrics.viewport);
+});
+
 test("progress card and cancellation work on desktop, Galaxy Tab, and phone", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   for (const viewport of [
@@ -74,6 +104,7 @@ test("progress card and cancellation work on desktop, Galaxy Tab, and phone", as
     await expect(card).toContainText("CLI 프로세스");
     await expect(card).toContainText("실시간 연결");
     await expect(page.locator("#cancel-button")).toBeVisible();
+    await expect(page.locator("#timeline-hide")).toBeDisabled();
     const width = await card.evaluate((element) => element.getBoundingClientRect().right);
     expect(width).toBeLessThanOrEqual(viewport.width);
     await page.locator("#cancel-button").click();

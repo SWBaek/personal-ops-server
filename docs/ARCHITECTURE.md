@@ -26,6 +26,7 @@ The versioned SQLite schema stores:
 - assistant profile and profile versions;
 - WorkOS configuration proposals and the confirmed configuration;
 - one conversation and provider segments;
+- reversible per-conversation browser-view cutoff for long timelines;
 - messages and durable jobs;
 - structured preflight plans;
 - activity summaries;
@@ -63,6 +64,8 @@ Web search, MCP/apps, subagents, external review, and remote Git are disabled by
 Provider Markdown is preserved unchanged in SQLite and API responses. The browser parses assistant messages as GitHub-flavored Markdown, sanitizes the generated HTML against an explicit element and attribute allowlist, and then adds safe external-link attributes. Owner messages use text nodes only.
 
 Markdown tables and code blocks own their horizontal scrolling so the application page remains contained on desktop, tablet, and phone.
+
+Timeline hiding is presentation state only. SQLite retains every message, job, plan, activity event, and receipt; the conversation row stores one nullable cutoff message identifier. The browser hides messages through that stable timeline position, shows the hidden count, and can restore the full timeline immediately.
 
 Typography is semantic rather than component-specific: Pretendard Variable is the UI, heading, prose, and table family; JetBrains Mono Variable is limited to code, logs, paths, commands, diffs, and identifiers. Version-pinned CDN stylesheets use system-font fallbacks and are not required for application startup or operation.
 

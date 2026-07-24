@@ -30,6 +30,10 @@ const reasoningSelect = $("#reasoning-select");
 const sendButton = $("#send-button");
 const cancelButton = $("#cancel-button");
 const composerStatus = $("#composer-status");
+const timelineHide = $("#timeline-hide");
+const timelineRestore = $("#timeline-restore");
+const hiddenHistory = $("#hidden-history");
+const hiddenHistoryCount = $("#hidden-history-count");
 const setupDialog = $("#setup-dialog");
 const setupForm = $("#setup-form");
 const setupCancel = $("#setup-cancel");
@@ -107,6 +111,8 @@ function bindEvents() {
   scrim.addEventListener("click", closeContext);
   $("#receipts-refresh").addEventListener("click", loadReceipts);
   $("#diff-close").addEventListener("click", () => diffDialog.close());
+  timelineHide.addEventListener("click", hideConversationHistory);
+  timelineRestore.addEventListener("click", restoreConversationHistory);
 }
 
 async function ensureConversation() {
@@ -160,6 +166,7 @@ async function sendMessage(event) {
     provider: state.conversation.provider,
     model: modelSelect.value,
     status: "completed",
+    createdAt: new Date().toISOString(),
   };
   state.messages.push(userMessage);
   input.value = "";
@@ -267,14 +274,48 @@ function finishFollow(success, text) {
   state.clockTimer = null;
   state.activeJobId = null;
   setBusy(false, text);
+  renderMessages();
   if (!success) toast(text);
 }
 
 function renderMessages() {
   const stayAtBottom = conversation.scrollHeight - conversation.scrollTop - conversation.clientHeight < 80;
-  intro.hidden = state.messages.length > 0;
-  messages.replaceChildren(...state.messages.map(renderMessage));
+  const cutoffId = state.conversation?.viewHiddenThroughMessageId;
+  const cutoffIndex = cutoffId
+    ? state.messages.findIndex((message) => message.id === cutoffId)
+    : -1;
+  const hidden = cutoffIndex >= 0 ? state.messages.slice(0, cutoffIndex + 1) : [];
+  const visible = cutoffIndex >= 0 ? state.messages.slice(cutoffIndex + 1) : state.messages;
+  intro.hidden = visible.length > 0 || hidden.length > 0;
+  hiddenHistory.hidden = hidden.length === 0;
+  hiddenHistoryCount.textContent = `이전 대화 ${hidden.length}개 숨김`;
+  timelineHide.disabled = Boolean(state.activeJobId)
+    || visible.every((message) => message.status === "pending")
+    || visible.length === 0;
+  messages.replaceChildren(...visible.map(renderMessage));
   if (stayAtBottom) requestAnimationFrame(() => conversation.scrollTo({ top: conversation.scrollHeight }));
+}
+
+async function hideConversationHistory() {
+  if (!state.conversation || state.activeJobId) return;
+  const result = await request(`/api/ai/conversations/${state.conversation.id}/view/hide-history`, {
+    method: "POST",
+    body: JSON.stringify({ confirmation: "HIDE_CHAT_HISTORY" }),
+  });
+  state.conversation = result.conversation;
+  renderMessages();
+  toast("이전 대화는 기록을 유지한 채 화면에서 숨겼습니다.");
+}
+
+async function restoreConversationHistory() {
+  if (!state.conversation) return;
+  const result = await request(`/api/ai/conversations/${state.conversation.id}/view/restore-history`, {
+    method: "POST",
+    body: JSON.stringify({ confirmation: "RESTORE_CHAT_HISTORY" }),
+  });
+  state.conversation = result.conversation;
+  renderMessages();
+  toast("숨긴 대화를 다시 표시했습니다.");
 }
 
 function renderMessage(message) {

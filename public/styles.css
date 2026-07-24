@@ -58,6 +58,7 @@ button { cursor: pointer; }
 .topbar-title p, .context-panel header p, .sheet header p, .diff-sheet header p { margin: 0; color: var(--gold); font-size: 10px; font-weight: 800; letter-spacing: .18em; }
 .topbar-title h1, .context-panel h2, .sheet h2, .diff-sheet h2 { margin: 3px 0 0; font: 650 22px/1.1 var(--font-sans); }
 .topbar-actions { display: flex; gap: 9px; align-items: center; }
+.timeline-button { padding: 8px 11px; font-size: 11px; white-space: nowrap; }
 .status-badge { padding: 8px 11px; border: 1px solid var(--line); background: white; border-radius: 999px; font-size: 12px; color: var(--muted); }
 .status-badge.clean { color: var(--green); border-color: #bfd2c4; background: #eff6f1; }
 .status-badge.dirty { color: var(--warn); border-color: #dfb89f; background: #fff3ec; }
@@ -85,6 +86,11 @@ button { cursor: pointer; }
 .intro-grid strong { font-size: 13px; }
 
 .messages { display: flex; flex-direction: column; gap: 20px; margin-top: 26px; }
+.hidden-history { margin: 24px 0 4px; display: flex; justify-content: center; align-items: center; gap: 9px; color: var(--muted); font-size: 11px; }
+.hidden-history[hidden] { display: none; }
+.hidden-history::before,
+.hidden-history::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+.hidden-history button { border: 0; background: transparent; padding: 7px; color: var(--green-2); text-decoration: underline; text-underline-offset: 3px; }
 .message { display: flex; gap: 12px; align-items: flex-start; }
 .message.user { justify-content: flex-end; }
 .message-bubble { min-width: 0; max-width: min(720px, 88%); border-radius: 17px; padding: 16px 18px; line-height: 1.7; overflow-wrap: anywhere; }
@@ -217,6 +223,7 @@ button { cursor: pointer; }
   .topbar { padding: 10px 14px; }
   .topbar-title h1 { font-size: 19px; }
   .status-badge { display: none; }
+  .timeline-button { max-width: 116px; overflow: hidden; text-overflow: ellipsis; }
   .conversation-inner { width: calc(100% - 24px); padding: 18px 0 24px; }
   .intro-card { padding: 20px; border-radius: 17px; }
   .intro-card h2 { font-size: 24px; }

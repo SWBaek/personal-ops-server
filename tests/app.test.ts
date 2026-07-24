@@ -76,7 +76,7 @@ test("first-run configuration validates Git and exposes only WorkOS-native APIs"
     assert.equal((await app.inject({ method: "GET", url: "/api/debug/summary" })).statusCode, 404);
 
     const health = await app.inject({ method: "GET", url: "/api/health" });
-    assert.equal(health.json().build, "workos-liveness-v1");
+    assert.equal(health.json().build, "workos-chat-view-v1");
     const markedModule = await app.inject({ method: "GET", url: "/vendor/marked.js" });
     assert.equal(markedModule.statusCode, 200);
     assert.match(markedModule.headers["content-type"] ?? "", /javascript/u);
@@ -163,6 +163,20 @@ test("conversation question completes through one direct provider answer", async
     const jobId = submitted.json().job.id as string;
     await waitFor(() => store.getAiJob(jobId)?.status === "succeeded");
     assert.equal(store.getAiMessage(store.getAiJob(jobId)!.assistantMessageId)!.content, "Synthetic answer");
+    const hidden = await app.inject({
+      method: "POST",
+      url: `/api/ai/conversations/${conversationId}/view/hide-history`,
+      payload: { confirmation: "HIDE_CHAT_HISTORY" },
+    });
+    assert.equal(hidden.statusCode, 200);
+    assert.ok(hidden.json().conversation.viewHiddenThroughMessageId);
+    assert.equal(store.listAiMessages(conversationId).length, 2);
+    const restored = await app.inject({
+      method: "POST",
+      url: `/api/ai/conversations/${conversationId}/view/restore-history`,
+      payload: { confirmation: "RESTORE_CHAT_HISTORY" },
+    });
+    assert.equal(restored.json().conversation.viewHiddenThroughMessageId, null);
   } finally {
     await app.close();
     store.close();

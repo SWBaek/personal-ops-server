@@ -53,7 +53,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   app.get("/api/health", async () => ({
     ok: true,
-    build: "workos-liveness-v1",
+    build: "workos-chat-view-v1",
     now: new Date().toISOString(),
   }));
 
@@ -61,7 +61,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     runtime: {
       environment: options.environment ?? "test",
       mode: "workos-native",
-      build: "workos-liveness-v1",
+      build: "workos-chat-view-v1",
     },
   }));
 
@@ -155,6 +155,39 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       messages: options.store.listAiMessages(conversation.id),
     };
   });
+
+  app.post<{ Params: { id: string }; Body: Record<string, unknown> }>(
+    "/api/ai/conversations/:id/view/hide-history",
+    async (request, reply) => {
+      requireConfirmation(request.body?.confirmation, "HIDE_CHAT_HISTORY");
+      try {
+        return { conversation: options.store.hideConversationHistory(request.params.id) };
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("not found")) {
+          return reply.code(404).send({ error: "AI 대화를 찾을 수 없습니다." });
+        }
+        if (error instanceof Error && error.message.includes("active request")) {
+          return reply.code(409).send({ error: "AI 작업이 진행 중일 때는 대화 기록을 숨길 수 없습니다." });
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string }; Body: Record<string, unknown> }>(
+    "/api/ai/conversations/:id/view/restore-history",
+    async (request, reply) => {
+      requireConfirmation(request.body?.confirmation, "RESTORE_CHAT_HISTORY");
+      try {
+        return { conversation: options.store.restoreConversationHistory(request.params.id) };
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("not found")) {
+          return reply.code(404).send({ error: "AI 대화를 찾을 수 없습니다." });
+        }
+        throw error;
+      }
+    },
+  );
 
   app.post<{ Params: { id: string }; Body: Record<string, unknown> }>(
     "/api/ai/conversations/:id/provider",
