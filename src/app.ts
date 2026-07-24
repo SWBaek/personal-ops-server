@@ -5,8 +5,7 @@ import { resolve } from "node:path";
 import {
   AI_PROVIDER_OPTIONS,
   AiChatError,
-  type AiChatService,
-  validateAiChatInput,
+  validateAiSelection,
 } from "./ai/chat-service.js";
 import { getProviderStatuses } from "./ai/provider-status.js";
 import {
@@ -15,362 +14,181 @@ import {
   type AiJobStreamEvent,
 } from "./ai/streaming-service.js";
 import { validateAssistantProfileInput } from "./domain/assistant-profile.js";
-import { InputError, localDateString, optionalIsoDate, requireNonEmptyText } from "./domain/validation.js";
-import {
-  DEBUG_DATASETS,
-  type DebugDatasetId,
-  OpsStore,
-} from "./infra/store.js";
-
-interface CreateCaptureBody {
-  body?: unknown;
-}
-
-interface CreateTaskBody {
-  title?: unknown;
-  scheduledOn?: unknown;
-  dueOn?: unknown;
-}
-
-interface UpdateTaskBody {
-  completed?: unknown;
-  scheduledOn?: unknown;
-}
-
-interface CreateAiConversationBody {
-  assistantSlot?: unknown;
-  provider?: unknown;
-  model?: unknown;
-  reasoningEffort?: unknown;
-}
-
-interface CreateAiMessageBody {
-  clientRequestId?: unknown;
-  message?: unknown;
-  model?: unknown;
-  reasoningEffort?: unknown;
-}
-
-interface ResetAiConversationBody {
-  provider?: unknown;
-  model?: unknown;
-  reasoningEffort?: unknown;
-}
-
-interface ConfirmDestructiveBody {
-  confirmation?: unknown;
-}
+import { InputError, requireNonEmptyText } from "./domain/validation.js";
+import { GitWorkspace } from "./infra/git-workspace.js";
+import { type OpsStore } from "./infra/store.js";
 
 interface BuildAppOptions {
   store: OpsStore;
-  aiChatService?: AiChatService;
-  aiConversationService?: AiConversationService;
+  aiConversationService: AiConversationService;
+  workspace: GitWorkspace;
   publicDir?: string;
-  aiRuntime?: {
-    environment: "development" | "production" | "test";
-    mode: "managed" | "custom";
-    isolated: boolean;
-  };
+  workspaceSeed?: string | null;
+  environment?: "development" | "production" | "test";
 }
 
 export async function buildApp(options: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
-
   await app.register(fastifyStatic, {
     root: options.publicDir ?? resolve("public"),
     prefix: "/",
   });
 
-  app.get("/api/health", async () => ({ ok: true, now: new Date().toISOString() }));
+  app.get("/api/health", async () => ({
+    ok: true,
+    build: "workos-native-v1",
+    now: new Date().toISOString(),
+  }));
 
   app.get("/api/system/runtime", async () => ({
-    runtime: options.aiRuntime ?? {
-      environment: "test",
-      mode: "managed",
-      isolated: true,
+    runtime: {
+      environment: options.environment ?? "test",
+      mode: "workos-native",
+      build: "workos-native-v1",
     },
   }));
 
-  app.get("/api/assistant/profile", async () => ({
-    profile: options.store.getAssistantProfile(),
-  }));
-
-  app.put<{ Body: Record<string, unknown> }>("/api/assistant/profile", async (request, reply) => {
-    requireConfirmation(request.body?.confirmation, "UPDATE_ASSISTANT_PROFILE");
-    if (options.store.hasActiveAiJobs()) {
-      return reply.code(409).send({ error: "진행 중인 AI 요청이 끝난 뒤 비서 구성을 변경해주세요." });
-    }
-    const profile = options.store.updateAssistantProfile(
-      validateAssistantProfileInput(request.body),
-    );
-    return { profile };
-  });
-
-  app.get("/api/captures", async () => ({ captures: options.store.listCaptures() }));
-
-  app.post<{ Body: CreateCaptureBody }>("/api/captures", async (request, reply) => {
-    const body = requireNonEmptyText(request.body?.body, "body");
-    const capture = options.store.createCapture(body);
-    return reply.code(201).send({ capture });
-  });
-
-  app.get<{ Querystring: { status?: string } }>("/api/inbox", async (request) => {
-    const status = request.query?.status;
-    if (status && !["pending", "confirmed", "rejected", "superseded"].includes(status)) {
-      throw new InputError("status is not allowed");
+  app.get("/api/workspace/status", async () => {
+    const configuration = options.store.getWorkspaceConfiguration();
+    if (!configuration) {
+      return {
+        configured: false,
+        suggestedRoot: options.workspaceSeed ?? null,
+        configuration: null,
+        validation: null,
+      };
     }
     return {
-      proposals: options.store.listIntakeProposals(
-        undefined,
-        status as import("./infra/store.js").IntakeProposalStatus | undefined,
-      ),
-      memos: status && status !== "confirmed" ? [] : options.store.listAssistantMemos(),
+      configured: true,
+      suggestedRoot: null,
+      configuration,
+      validation: options.workspace.validate(configuration.rootPath),
     };
   });
 
-  app.get<{ Params: { id: string } }>("/api/inbox/:id", async (request, reply) => {
-    const memo = options.store.getAssistantMemo(request.params.id);
-    if (!memo) return reply.code(404).send({ error: "비서 메모를 찾을 수 없습니다." });
-    return { memo, versions: options.store.listAssistantMemoVersions(memo.id) };
-  });
-
-  app.get<{ Params: { id: string; version: string } }>(
-    "/api/inbox/:id/versions/:version",
-    async (request, reply) => {
-      if (!/^[1-9]\d*$/u.test(request.params.version)) {
-        throw new InputError("version must be a positive integer");
-      }
-      const version = Number.parseInt(request.params.version, 10);
-      if (!Number.isSafeInteger(version)) {
-        throw new InputError("version must be a positive integer");
-      }
-      const memoVersion = options.store.getAssistantMemoVersion(request.params.id, version);
-      if (!memoVersion) {
-        return reply.code(404).send({ error: "해당 비서 메모 버전을 찾을 수 없습니다." });
-      }
-      return { memoVersion };
-    },
-  );
-
-  app.get("/api/projects", async () => ({
-    projects: options.store.listProjects(),
-  }));
-
-  app.get<{ Params: { id: string } }>("/api/projects/:id", async (request, reply) => {
-    const brief = options.store.getProjectBrief(request.params.id);
-    if (!brief) return reply.code(404).send({ error: "프로젝트를 찾을 수 없습니다." });
-    return { brief };
-  });
-
-  app.get("/api/debug/summary", async () => ({
-    summary: options.store.debugSummary(),
-  }));
-
-  app.get<{ Params: { dataset: string }; Querystring: { limit?: string } }>(
-    "/api/debug/data/:dataset",
-    async (request) => {
-      const dataset = request.params.dataset;
-      if (!DEBUG_DATASETS.some((candidate) => candidate.id === dataset)) {
-        throw new InputError("debug dataset is not allowed");
-      }
-      const limit = request.query?.limit === undefined
-        ? 50
-        : Number.parseInt(request.query.limit, 10);
-      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-        throw new InputError("limit must be an integer from 1 to 100");
-      }
-      return {
-        dataset,
-        rows: options.store.debugDataset(dataset as DebugDatasetId, limit),
-      };
-    },
-  );
-
-  app.get<{ Querystring: { view?: string } }>("/api/tasks", async (request) => {
-    const tasks =
-      request.query.view === "today"
-        ? options.store.listTodayTasks(localDateString())
-        : options.store.listOpenTasks();
-    return { tasks };
-  });
-
-  app.post<{ Body: CreateTaskBody }>("/api/tasks", async (request, reply) => {
-    const task = options.store.createTask({
-      title: requireNonEmptyText(request.body?.title, "title", 500),
-      scheduledOn: optionalIsoDate(request.body?.scheduledOn, "scheduledOn"),
-      dueOn: optionalIsoDate(request.body?.dueOn, "dueOn"),
+  app.post<{
+    Body: { rootPath?: unknown; codexGranted?: unknown; grokGranted?: unknown };
+  }>("/api/workspace/configuration/proposals", async (request, reply) => {
+    if (options.store.hasActiveAiJobs()) {
+      return reply.code(409).send({ error: "AI 작업이 진행 중일 때는 WorkOS 설정을 바꿀 수 없습니다." });
+    }
+    const rootPath = requireNonEmptyText(request.body?.rootPath, "rootPath", 2_000);
+    const codexGranted = requireBoolean(request.body?.codexGranted, "codexGranted");
+    const grokGranted = requireBoolean(request.body?.grokGranted, "grokGranted");
+    if (!codexGranted && !grokGranted) {
+      throw new InputError("At least one provider must be granted WorkOS access");
+    }
+    const validation = options.workspace.validate(rootPath);
+    const proposal = options.store.createWorkspaceConfigProposal({
+      rootPath: validation.rootPath,
+      codexGranted,
+      grokGranted,
+      validation,
     });
-    return reply.code(201).send({ task });
+    return reply.code(201).send({ proposal });
   });
 
-  app.patch<{ Params: { id: string }; Body: UpdateTaskBody }>(
-    "/api/tasks/:id",
+  app.post<{ Params: { id: string }; Body: { confirmation?: unknown } }>(
+    "/api/workspace/configuration/proposals/:id/confirm",
     async (request, reply) => {
-      const patch: { completed?: boolean; scheduledOn?: string | null } = {};
-
-      if (request.body?.completed !== undefined) {
-        if (typeof request.body.completed !== "boolean") {
-          throw new Error("completed must be a boolean");
-        }
-        patch.completed = request.body.completed;
+      requireConfirmation(request.body?.confirmation, "CONNECT_WORKOS");
+      if (options.store.hasActiveAiJobs()) {
+        return reply.code(409).send({ error: "AI 작업이 진행 중일 때는 WorkOS 설정을 바꿀 수 없습니다." });
       }
-      if (request.body?.scheduledOn !== undefined) {
-        patch.scheduledOn = optionalIsoDate(request.body.scheduledOn, "scheduledOn");
+      const proposal = options.store.getWorkspaceConfigProposal(request.params.id);
+      if (!proposal) return reply.code(404).send({ error: "WorkOS 설정 제안을 찾을 수 없습니다." });
+      const currentValidation = options.workspace.validate(proposal.rootPath);
+      if (!currentValidation.valid) {
+        return reply.code(409).send({ error: currentValidation.errors.join("; "), validation: currentValidation });
       }
-      if (Object.keys(patch).length === 0) {
-        return reply.code(400).send({ error: "No supported changes were provided" });
-      }
-
-      const task = options.store.updateTask(request.params.id, patch);
-      if (!task) {
-        return reply.code(404).send({ error: "Task not found" });
-      }
-      return { task };
+      const configuration = options.store.confirmWorkspaceConfigProposal(proposal.id);
+      return { configuration, validation: currentValidation };
     },
   );
+
+  app.get("/api/assistant/profile", async () => ({ profile: options.store.getAssistantProfile() }));
+  app.put<{ Body: Record<string, unknown> }>("/api/assistant/profile", async (request, reply) => {
+    requireConfirmation(request.body?.confirmation, "UPDATE_ASSISTANT_PROFILE");
+    if (options.store.hasActiveAiJobs()) {
+      return reply.code(409).send({ error: "AI 작업이 진행 중일 때는 비서 설정을 바꿀 수 없습니다." });
+    }
+    return { profile: options.store.updateAssistantProfile(validateAssistantProfileInput(request.body)) };
+  });
 
   app.get("/api/ai/providers", async () => ({ providers: await getProviderStatuses() }));
-
   app.get("/api/ai/options", async () => ({ providers: AI_PROVIDER_OPTIONS }));
 
-  app.post<{ Body: Parameters<typeof validateAiChatInput>[0] }>(
-    "/api/ai/chat",
-    async (request) => {
-      if (!options.aiChatService) {
-        throw new AiChatError("AI chat is not configured", 503);
-      }
-      const input = validateAiChatInput(request.body);
-      const result = await options.aiChatService.chat(input);
-      return {
-        provider: input.provider,
-        model: input.model,
-        reasoningEffort: input.reasoningEffort,
-        ...result,
-      };
-    },
-  );
-
   app.get("/api/ai/conversations", async () => ({
-    conversations: options.store.listAiConversations().map(publicConversation),
-    archivedConversations: options.store.listArchivedAiConversations().map(publicConversation),
+    conversations: options.store.listAiConversations(),
   }));
 
-  app.post<{ Body: ConfirmDestructiveBody }>("/api/ai/history/clear", async (request, reply) => {
-    requireConfirmation(request.body?.confirmation, "DELETE_AI_HISTORY");
-    if (options.store.hasActiveAiJobs()) {
-      return reply.code(409).send({ error: "진행 중인 AI 요청을 먼저 취소해주세요." });
-    }
-    return { deleted: options.store.clearAiHistory() };
-  });
-
-  app.post<{ Body: ConfirmDestructiveBody }>("/api/system/reset-data", async (request, reply) => {
-    requireConfirmation(request.body?.confirmation, "RESET_ALL_DATA");
-    if (options.store.hasActiveAiJobs()) {
-      return reply.code(409).send({ error: "진행 중인 AI 요청을 먼저 취소해주세요." });
-    }
-    return { deleted: options.store.resetAllData() };
-  });
-
-  app.post<{ Body: CreateAiConversationBody }>("/api/ai/conversations", async (request, reply) => {
-    requireAiConversationService(options.aiConversationService);
+  app.post<{ Body: Record<string, unknown> }>("/api/ai/conversations", async (request, reply) => {
     const selection = validateAiSelection(request.body);
-    const assistantSlot = optionalAssistantSlot(request.body?.assistantSlot);
-    let conversation;
-    try {
-      conversation = options.store.createAiConversation({
-        ...selection,
-        ...(assistantSlot ? { assistantSlot } : {}),
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("assistant")) {
-        throw new AiChatError("활성 비서는 최대 두 명까지 사용할 수 있습니다.", 409);
-      }
-      throw error;
-    }
-    return reply.code(201).send({ conversation: publicConversation(conversation) });
+    const configuration = options.store.getWorkspaceConfiguration();
+    if (!configuration) throw new AiChatError("WorkOS 초기 설정이 필요합니다.", 409);
+    const conversation = options.store.createAiConversation(selection);
+    return reply.code(201).send({ conversation });
   });
 
   app.get<{ Params: { id: string } }>("/api/ai/conversations/:id", async (request, reply) => {
     const conversation = options.store.getAiConversation(request.params.id);
     if (!conversation) return reply.code(404).send({ error: "AI 대화를 찾을 수 없습니다." });
     return {
-      conversation: publicConversation(conversation),
+      conversation,
       messages: options.store.listAiMessages(conversation.id),
     };
   });
 
-  app.post<{ Params: { id: string }; Body: ResetAiConversationBody }>(
-    "/api/ai/conversations/:id/reset",
+  app.post<{ Params: { id: string }; Body: Record<string, unknown> }>(
+    "/api/ai/conversations/:id/provider",
     async (request, reply) => {
-      requireAiConversationService(options.aiConversationService);
-      const current = options.store.getActiveAiConversation(request.params.id);
-      if (!current) return reply.code(404).send({ error: "활성 비서를 찾을 수 없습니다." });
-      const selection = validateAiSelection({
-        provider: request.body?.provider ?? current.provider,
-        model: request.body?.model ?? current.defaultModel,
-        reasoningEffort: request.body?.reasoningEffort ?? current.defaultReasoningEffort,
-      });
+      const selection = validateAiSelection(request.body);
       try {
-        const conversation = options.store.resetAiConversation(request.params.id, selection);
-        return reply.code(201).send({ conversation: publicConversation(conversation) });
+        return { conversation: options.store.switchConversationProvider(request.params.id, selection) };
       } catch (error) {
-        if (error instanceof Error && error.message.includes("active request")) {
-          throw new AiChatError("진행 중인 응답을 취소한 뒤 맥락을 초기화하세요.", 409);
-        }
         if (error instanceof Error && error.message.includes("not found")) {
-          return reply.code(404).send({ error: "활성 비서를 찾을 수 없습니다." });
+          return reply.code(404).send({ error: "AI 대화를 찾을 수 없습니다." });
         }
         throw error;
       }
     },
   );
 
-  app.post<{ Params: { id: string }; Body: CreateAiMessageBody }>(
-    "/api/ai/conversations/:id/messages",
-    async (request, reply) => {
-      const service = requireAiConversationService(options.aiConversationService);
-      const conversation = options.store.getActiveAiConversation(request.params.id);
-      if (!conversation) return reply.code(404).send({ error: "AI 대화를 찾을 수 없습니다." });
-      const selection = validateAiSelection({
-        provider: conversation.provider,
-        model: request.body?.model ?? conversation.defaultModel,
-        reasoningEffort: request.body?.reasoningEffort ?? conversation.defaultReasoningEffort,
+  app.post<{
+    Params: { id: string };
+    Body: { clientRequestId?: unknown; message?: unknown; model?: unknown; reasoningEffort?: unknown };
+  }>("/api/ai/conversations/:id/messages", async (request, reply) => {
+    const conversation = options.store.getAiConversation(request.params.id);
+    if (!conversation) return reply.code(404).send({ error: "AI 대화를 찾을 수 없습니다." });
+    const selection = validateAiSelection({
+      provider: conversation.provider,
+      model: request.body?.model ?? conversation.defaultModel,
+      reasoningEffort: request.body?.reasoningEffort ?? conversation.defaultReasoningEffort,
+    });
+    const clientRequestId = requireUuid(request.body?.clientRequestId, "clientRequestId");
+    const message = requireNonEmptyText(request.body?.message, "message", 8_000);
+    let turn;
+    try {
+      turn = options.store.createAiTurn({
+        conversationId: conversation.id,
+        clientRequestId,
+        message,
+        model: selection.model,
+        reasoningEffort: selection.reasoningEffort,
       });
-      const clientRequestId = requireUuid(request.body?.clientRequestId, "clientRequestId");
-      const message = requireNonEmptyText(request.body?.message, "message", 8_000);
-      let turn;
-      try {
-        turn = options.store.createAiTurn({
-          conversationId: conversation.id,
-          clientRequestId,
-          message,
-          model: selection.model,
-          reasoningEffort: selection.reasoningEffort,
-        });
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("active request")) {
-          throw new AiChatError("이 대화에서 이미 AI 요청을 처리하고 있습니다.", 409);
-        }
-        if (error instanceof Error && error.message.includes("client request id")) {
-          throw new AiChatError("clientRequestId가 이미 다른 요청에 사용되었습니다.", 409);
-        }
-        throw error;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("active request")) {
+        throw new AiChatError("이미 다른 AI 요청을 처리하고 있습니다.", 409);
       }
-      service.enqueue(turn.job.id);
-      return reply.code(202).send({
-        job: publicJob(turn.job),
-        userMessage: turn.userMessage,
-        assistantMessage: turn.assistantMessage,
-        duplicate: turn.duplicate,
-      });
-    },
-  );
+      throw error;
+    }
+    options.aiConversationService.enqueue(turn.job.id);
+    return reply.code(202).send(turn);
+  });
 
   app.get<{ Params: { id: string } }>("/api/ai/jobs/:id/events", async (request, reply) => {
-    const service = requireAiConversationService(options.aiConversationService);
-    const snapshot = service.snapshot(request.params.id);
+    const snapshot = options.aiConversationService.snapshot(request.params.id);
     if (!snapshot) return reply.code(404).send({ error: "AI 작업을 찾을 수 없습니다." });
-
     reply.hijack();
     reply.raw.writeHead(200, {
       "content-type": "text/event-stream; charset=utf-8",
@@ -378,37 +196,76 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       connection: "keep-alive",
       "x-accel-buffering": "no",
     });
-    let heartbeat: NodeJS.Timeout | null = null;
-    const unsubscribe = service.subscribe(request.params.id, (event) => {
-      writeAiJobEvent(reply.raw, event);
-      if (event.type === "completed" || event.type === "failed") {
-        if (heartbeat) clearInterval(heartbeat);
+    const unsubscribe = options.aiConversationService.subscribe(request.params.id, (event) => {
+      writeJobEvent(reply.raw, event);
+      if (terminal(event)) {
         unsubscribe();
         reply.raw.end();
       }
     });
-    const currentSnapshot = service.snapshot(request.params.id) ?? snapshot;
-    writeSse(reply.raw, "snapshot", publicSnapshot(currentSnapshot));
-    if (isTerminalAiJob(currentSnapshot.job.status)) {
+    writeSse(reply.raw, "snapshot", publicSnapshot(snapshot));
+    if (snapshot.job.status === "approval_required") {
+      writeSse(reply.raw, "approval_required", publicSnapshot(snapshot));
       unsubscribe();
-      writeTerminalSnapshot(reply.raw, currentSnapshot);
       reply.raw.end();
       return;
     }
-
-    heartbeat = setInterval(() => reply.raw.write(": keep-alive\n\n"), 15_000);
+    if (isTerminalStatus(snapshot.job.status)) {
+      writeSse(reply.raw, snapshot.job.status === "succeeded" ? "completed" : "failed", publicSnapshot(snapshot));
+      unsubscribe();
+      reply.raw.end();
+      return;
+    }
+    const heartbeat = setInterval(() => reply.raw.write(": keep-alive\n\n"), 15_000);
     request.raw.once("close", () => {
-      if (heartbeat) clearInterval(heartbeat);
+      clearInterval(heartbeat);
       unsubscribe();
     });
   });
 
-  app.post<{ Params: { id: string } }>("/api/ai/jobs/:id/cancel", async (request, reply) => {
-    const service = requireAiConversationService(options.aiConversationService);
-    const snapshot = service.cancel(request.params.id);
+  app.post<{ Params: { id: string } }>("/api/ai/jobs/:id/approve", async (request, reply) => {
+    const snapshot = options.aiConversationService.approve(request.params.id);
     if (!snapshot) return reply.code(404).send({ error: "AI 작업을 찾을 수 없습니다." });
     return { snapshot: publicSnapshot(snapshot) };
   });
+
+  app.post<{ Params: { id: string } }>("/api/ai/jobs/:id/reject", async (request, reply) => {
+    const snapshot = options.aiConversationService.reject(request.params.id);
+    if (!snapshot) return reply.code(404).send({ error: "AI 작업을 찾을 수 없습니다." });
+    return { snapshot: publicSnapshot(snapshot) };
+  });
+
+  app.post<{ Params: { id: string } }>("/api/ai/jobs/:id/cancel", async (request, reply) => {
+    const snapshot = options.aiConversationService.cancel(request.params.id);
+    if (!snapshot) return reply.code(404).send({ error: "AI 작업을 찾을 수 없습니다." });
+    return { snapshot: publicSnapshot(snapshot) };
+  });
+
+  app.get("/api/workspace/receipts", async () => ({
+    receipts: options.store.listReceipts(),
+  }));
+
+  app.get<{ Params: { id: string } }>("/api/workspace/receipts/:id/diff", async (request, reply) => {
+    try {
+      return { diff: options.aiConversationService.receiptDiff(request.params.id) };
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("not found")) {
+        return reply.code(404).send({ error: "Receipt를 찾을 수 없습니다." });
+      }
+      throw error;
+    }
+  });
+
+  app.post<{ Params: { id: string }; Body: { confirmation?: unknown } }>(
+    "/api/workspace/receipts/:id/undo",
+    async (request, reply) => {
+      requireConfirmation(request.body?.confirmation, "UNDO_LATEST_RECEIPT");
+      if (options.store.hasActiveAiJobs()) {
+        return reply.code(409).send({ error: "AI 작업이 진행 중일 때는 Undo할 수 없습니다." });
+      }
+      return { receipt: options.aiConversationService.undoReceipt(request.params.id) };
+    },
+  );
 
   app.setErrorHandler((error, _request, reply) => {
     const message = error instanceof Error ? error.message : "Unexpected server error";
@@ -418,56 +275,27 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
         : undefined;
     const statusCode = typeof statusCodeValue === "number"
       ? statusCodeValue
-      : message.includes("must be")
+      : message.includes("must") || message.includes("not supported")
         ? 400
-        : 500;
-
-    if (statusCode >= 500) {
-      app.log.error(error);
-    }
+        : message.includes("active") || message.includes("clean") || message.includes("diverged")
+          ? 409
+          : 500;
+    if (statusCode >= 500) app.log.error(error);
     void reply.code(statusCode).send({ error: message });
   });
 
   return app;
 }
 
-function validateAiSelection(body: CreateAiConversationBody | undefined): {
-  provider: "codex" | "grok";
-  model: string;
-  reasoningEffort: string;
-} {
-  if (typeof body?.provider !== "string") throw new InputError("provider is not supported");
-  const provider = AI_PROVIDER_OPTIONS.find((candidate) => candidate.id === body.provider);
-  if (!provider) throw new InputError("provider is not supported");
-  const model = body.model ?? "default";
-  const reasoningEffort = body.reasoningEffort ?? "default";
-  if (typeof model !== "string" || !provider.models.some((candidate) => candidate.id === model)) {
-    throw new InputError("model is not supported");
-  }
-  if (
-    typeof reasoningEffort !== "string"
-    || !provider.reasoningEfforts.some((candidate) => candidate.id === reasoningEffort)
-  ) {
-    throw new InputError("reasoningEffort is not supported");
-  }
-  return { provider: provider.id, model, reasoningEffort };
-}
-
-function requireAiConversationService(service: AiConversationService | undefined): AiConversationService {
-  if (!service) throw new AiChatError("AI conversations are not configured", 503);
-  return service;
-}
-
-function optionalAssistantSlot(value: unknown): 1 | 2 | undefined {
-  if (value === undefined) return undefined;
-  if (value !== 1 && value !== 2) throw new InputError("assistantSlot must be 1 or 2");
+function requireBoolean(value: unknown, field: string): boolean {
+  if (typeof value !== "boolean") throw new InputError(`${field} must be a boolean`);
   return value;
 }
 
 function requireUuid(value: unknown, field: string): string {
   if (
     typeof value !== "string"
-    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value)
   ) {
     throw new InputError(`${field} must be a UUID`);
   }
@@ -475,37 +303,17 @@ function requireUuid(value: unknown, field: string): string {
 }
 
 function requireConfirmation(value: unknown, expected: string): void {
-  if (value !== expected) throw new InputError("destructive action confirmation does not match");
-}
-
-function publicConversation(conversation: ReturnType<OpsStore["createAiConversation"]>) {
-  const { providerThreadId: _providerThreadId, ...safe } = conversation;
-  return safe;
-}
-
-function publicJob(job: AiJobSnapshot["job"]) {
-  const { clientRequestId: _clientRequestId, ...safe } = job;
-  return safe;
+  if (value !== expected) throw new InputError("confirmation does not match");
 }
 
 function publicSnapshot(snapshot: AiJobSnapshot) {
-  return {
-    job: publicJob(snapshot.job),
-    message: snapshot.message,
-    ...(snapshot.intakeOutcome ? { intakeOutcome: snapshot.intakeOutcome } : {}),
-  };
+  const { clientRequestId: _clientRequestId, ...job } = snapshot.job;
+  return { ...snapshot, job };
 }
 
-function isTerminalAiJob(status: AiJobSnapshot["job"]["status"]): boolean {
-  return ["succeeded", "failed", "cancelled", "interrupted"].includes(status);
-}
-
-function writeAiJobEvent(
-  raw: { write(chunk: string): unknown },
-  event: AiJobStreamEvent,
-): void {
-  if (event.type === "completed") {
-    writeSse(raw, "completed", { ...publicSnapshot(event.snapshot), streamMode: event.streamMode });
+function writeJobEvent(raw: { write(chunk: string): unknown }, event: AiJobStreamEvent): void {
+  if (event.type === "completed" || event.type === "approval_required") {
+    writeSse(raw, event.type, publicSnapshot(event.snapshot));
   } else if (event.type === "failed") {
     writeSse(raw, "failed", { ...publicSnapshot(event.snapshot), error: event.error });
   } else {
@@ -513,17 +321,14 @@ function writeAiJobEvent(
   }
 }
 
-function writeTerminalSnapshot(raw: { write(chunk: string): unknown }, snapshot: AiJobSnapshot): void {
-  if (snapshot.job.status === "succeeded") {
-    writeSse(raw, "completed", publicSnapshot(snapshot));
-  } else {
-    writeSse(raw, "failed", {
-      ...publicSnapshot(snapshot),
-      error: snapshot.job.error ?? "AI 요청이 완료되지 않았습니다.",
-    });
-  }
-}
-
 function writeSse(raw: { write(chunk: string): unknown }, event: string, data: unknown): void {
   raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
+function terminal(event: AiJobStreamEvent): boolean {
+  return event.type === "completed" || event.type === "failed" || event.type === "approval_required";
+}
+
+function isTerminalStatus(status: AiJobSnapshot["job"]["status"]): boolean {
+  return ["succeeded", "failed", "cancelled", "interrupted", "needs_review"].includes(status);
 }

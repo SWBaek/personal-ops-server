@@ -1,35 +1,23 @@
 import { join } from "node:path";
 
-import { CliAiChatService } from "./ai/chat-service.js";
-import { AiConversationService, CliStreamingProvider } from "./ai/streaming-service.js";
+import { AiConversationService } from "./ai/streaming-service.js";
+import { CliWorkspaceProvider } from "./ai/workspace-provider.js";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
+import { GitWorkspace } from "./infra/git-workspace.js";
 import { OpsStore } from "./infra/store.js";
-import {
-  prepareAiRuntime,
-  verifyGrokRuntimeIsolation,
-} from "./runtime/ai-runtime.js";
 
 const config = loadConfig();
-prepareAiRuntime(config.aiRuntime);
-verifyGrokRuntimeIsolation(config.aiRuntime);
-const store = new OpsStore(join(config.dataDir, "personal-ops.db"));
-const aiChatService = new CliAiChatService({
-  workingDirectory: config.aiWorkingDir,
-});
-const aiConversationService = new AiConversationService(
-  store,
-  new CliStreamingProvider({ workingDirectory: config.aiWorkingDir }),
-);
+const store = new OpsStore(join(config.dataDir, "workos-runtime.db"));
+const workspace = new GitWorkspace();
+const provider = new CliWorkspaceProvider(config.runtimeDir);
+const aiConversationService = new AiConversationService(store, provider, workspace);
 const app = await buildApp({
   store,
-  aiChatService,
+  workspace,
   aiConversationService,
-  aiRuntime: {
-    environment: config.aiRuntime.environment,
-    mode: config.aiRuntime.mode,
-    isolated: true,
-  },
+  workspaceSeed: config.workspaceSeed,
+  environment: config.environment,
 });
 
 app.addHook("onClose", async () => {
@@ -42,7 +30,6 @@ const close = async (signal: string): Promise<void> => {
   await app.close();
   process.exit(0);
 };
-
 process.once("SIGINT", () => void close("SIGINT"));
 process.once("SIGTERM", () => void close("SIGTERM"));
 

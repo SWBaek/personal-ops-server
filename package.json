@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A local-first personal operations server with subscription-authenticated AI CLI adapters.",
+  "description": "A private WorkOS web assistant using locally authenticated Codex and Grok CLIs.",
   "engines": {
     "node": ">=24.0.0"
   },

@@ -1,201 +1,65 @@
 # Architecture
 
-## Target system
-
-The home computer is the single authoritative host. Personal devices connect through the owner's private tailnet. The browser presents one chief-assistant conversation plus inspectable operational views. Specialist roles operate behind the chief assistant and share one application-owned world model.
+## System boundary
 
 ```text
-Phone / Tablet / Remote PC
-            |
-       private tailnet
-            |
-    Tailscale Serve (HTTPS)
-            |
-  Fastify on 127.0.0.1:4310
-            |
-  Conversation and Command Gateway
-            |
-   Chief Assistant Orchestrator
-       |                 |
- Project Manager   Knowledge Researcher
-       \                 /
-        Context and Domain Tools
-                 |
- Intent → Policy → Validation → Commit
-                 |
-  Evidence | Operational Ledger | Knowledge
-                 |
-    Jobs | Receipts | Corrections | Audit
-                 |
-      Codex / Grok CLI adapters
+Browser
+  -> Fastify API and SSE
+     -> deterministic plan/authority validator
+     -> durable SQLite runtime ledger
+     -> Codex or Grok adapter
+        -> configured WorkOS Git root
+           -> AGENTS.md / PKM rules / skills / content
+     -> local Git receipt and Undo controller
+
+Obsidian Sync <-> WorkOS files
+Optional remote Git <-> owner-managed, outside the default application flow
 ```
 
-The diagram describes responsibility, not a requirement for separate processes. The first implementation may run the chief assistant and specialists through the same durable job runner with different role instructions, context builders, and tool allowlists.
+WorkOS is canonical. SQLite is a runtime and audit ledger only.
 
-## Architectural invariants
+## Runtime data
 
-1. There is one canonical operational state.
-2. An agent role never owns a private copy of a project, action, person, event, decision, or knowledge artifact.
-3. Models cannot write canonical state directly.
-4. Every mutation crosses an application-owned typed command boundary.
-5. Evidence, interpretation, proposal, and committed state remain distinguishable.
-6. Conversation and provider thread history are not canonical memory.
-7. Provider failure may stop intelligent work but must not corrupt or ambiguously commit state.
-8. The browser never exposes a general shell or provider-control protocol.
+The versioned SQLite schema stores:
 
-## Layers
+- assistant profile and profile versions;
+- WorkOS configuration proposals and the confirmed configuration;
+- one conversation and provider segments;
+- messages and durable jobs;
+- structured preflight plans;
+- activity summaries;
+- local Git receipts and Undo relationships.
 
-### Browser UI
+It deliberately does not store projects, tasks, events, memos, snapshots, knowledge, FTS indexes, or WorkOS file contents.
 
-The primary surface is one durable chief-assistant conversation. The UI also exposes object views for Projects, Schedule, Knowledge, Inbox/Evidence, Reviews, and Receipts.
+## Turn lifecycle
 
-The owner may address a specialist directly as an advanced shortcut, but should not need to select a role for ordinary requests. Model and reasoning controls remain secondary. Progress displays the job and role currently working, while final results show evidence and committed changes rather than raw internal traces.
+1. The server validates the browser request and provider selection.
+2. It verifies that the provider has an owner grant and that the root remains valid.
+3. The provider runs a structured read-only preflight in the WorkOS root.
+4. The server validates the plan and deterministically escalates risk when required.
+5. Observe completes without execution.
+6. Govern pauses in `approval_required`.
+7. Execution requires a valid clean worktree and an unchanged approved plan.
+8. The provider edits only within WorkOS.
+9. The server compares actual and expected paths.
+10. Matching changes become one application-owned local commit and receipt.
+11. Unexpected or interrupted changes enter `needs_review`; they are not auto-committed.
 
-The existing two-slot assistant UI is transitional infrastructure, not the target information architecture.
+Jobs survive browser reload and interrupted jobs are reconciled at server startup.
 
-### Conversation and command gateway
+## Provider boundary
 
-Fastify owns request validation, conversation persistence, streaming, cancellation, authentication middleware, static assets, and APIs. It binds to localhost.
+Both providers implement the same plan and execution interfaces. CLI arguments are arrays and use `shell: false`. The configured WorkOS root is the working directory, allowing the provider to inherit WorkOS instructions naturally.
 
-The gateway converts a user turn into a durable assistant job. It supplies the chief assistant with the active subject, relevant shared state, source references, available domain tools, and the authority envelope for the request.
+Web search, MCP/apps, subagents, external review, and remote Git are disabled by default. A later workflow may add a narrowly scoped capability only behind Govern approval.
 
-### Chief assistant orchestrator
+## Git boundary
 
-The chief assistant performs four responsibilities:
+The application requires local Git for transaction safety. It does not require or operate a remote. It stages only validated changed paths, creates one receipt commit, and can revert only the latest receipt when HEAD and worktree preconditions still match.
 
-1. identify intent, subject, ambiguity, and risk;
-2. request the smallest relevant context package;
-3. delegate bounded specialist work when it improves quality or context isolation;
-4. reconcile findings and proposals into one owner-facing result.
+Obsidian Sync remains independent. Git commit creation does not promise that Obsidian Sync has completed, and Obsidian Sync status is not inferred from Git.
 
-Delegation is not required for simple work. A specialist receives only its goal, selected evidence, relevant state, tools, and authority. It cannot expand these scopes or write shared memory outside typed operations.
+## Deployment
 
-### Specialist roles
-
-The first roles are configuration and policy boundaries over a common runtime:
-
-- **Project manager**: project status, actions, meetings, dependencies, risks, decisions, stakeholder context, and follow-up.
-- **Knowledge researcher**: internal retrieval, external research when authorized, source comparison, claim/evidence separation, contradictions, and reusable knowledge artifacts.
-
-Future roles require a documented need for different tools, context, evaluation, or authority. Personality alone is not enough to create another agent.
-
-### Context builder
-
-The context builder assembles a goal-specific package rather than exposing the whole personal corpus. Inputs may include:
-
-- the owner's versioned chief-assistant profile and bounded preferences;
-- the named or inferred project, person, event, or knowledge topic;
-- current commitments, dependencies, risks, and decisions;
-- exact evidence excerpts and provenance;
-- recent receipts, corrections, and unresolved proposals;
-- the role's policy and permitted domain tools.
-
-Start with deterministic relational and full-text retrieval. Add embeddings or graph traversal only after measured retrieval failures justify them.
-
-### Domain service and intent pipeline
-
-Agents call typed application tools such as:
-
-- `get_project_brief`
-- `search_evidence`
-- `propose_action`
-- `reschedule_action`
-- `record_decision`
-- `record_dependency`
-- `create_knowledge_artifact`
-- `link_source`
-
-Tool names are illustrative until the domain contract is accepted.
-
-Mutation flow:
-
-```text
-agent-generated structured intent
-  → schema validation
-  → authority and risk policy
-  → domain invariant validation
-  → idempotency and conflict check
-  → transaction commit
-  → receipt and undo record
-  → projection refresh
-```
-
-No model receives raw SQL or a filesystem path as a mutation interface.
-
-### Data model
-
-SQLite remains the initial canonical operational store. The refoundation introduces explicit classes instead of forcing all data into tasks or conversations.
-
-#### Evidence
-
-Original capture text, imported records, meeting material, files, URLs, content hashes, timestamps, source type, trust zone, and ingestion state. Evidence is preserved and not silently rewritten by synthesis.
-
-#### Operational ledger
-
-Projects, actions/commitments, events, people, dependencies, risks, decisions, relationships, and their current state. Important records carry stable IDs and source references.
-
-#### Knowledge
-
-Source-backed artifacts containing claims, evidence, inference, contradictions, and open questions. Knowledge may be revised while preserving provenance and history.
-
-#### Agent and audit state
-
-Conversations, messages, jobs, role invocations, proposals, approvals, receipts, corrections, and provider-thread mappings. Agent memory contains only bounded preferences and learned procedures; it does not duplicate the operational ledger.
-
-SQLite relation tables and FTS are the default. A graph database or embedding index is a derived optimization, never a second source of truth.
-
-The project read slice uses a hybrid retrieval contract. `PRAGMA user_version` migrations preserve existing databases. Confirmed memo versions retain reviewed `projection_json`; stable `projects` and normalized aliases identify a project, while project/action/decision/dependency/risk/meeting/judgment snapshots remain rebuildable and source-version pinned. Exact project questions read the complete current snapshot set through SQL rather than an FTS top-k. FTS5 remains a bounded fallback for general or unresolved questions and never earns complete coverage by itself.
-
-Each turn persists a deterministic `RetrievalPlan`, reader, as-of time, owner timezone, server-owned coverage, unresolved conditions, truncation reason, and included or excluded candidates. Project coverage is complete only when every current memo is classified and the complete relevant snapshot set fits the context. Model grounding cannot upgrade coverage. Assistant messages retain the retrieval-run ID, coverage, structured project brief, and `memo:<id>:v<version>` references so reloads render the same evidence.
-
-### AI runtime and adapters
-
-Adapters call installed binaries only:
-
-- Codex: private app-server stdio text events with stable `codex exec` fallback.
-- Grok: official Grok Build headless streaming JSON.
-
-Provider adapters expose capabilities, not product roles. The role runtime supplies instructions, context, tools, and schemas independently of the chosen provider.
-
-The current read-only runner uses a stable application-managed runtime directory outside every Git repository and no domain tools. Development, production, and automated tests have separate runtime namespaces. Codex parent-project discovery is disabled as defense in depth; Grok and Codex therefore cannot inherit the development repository's `AGENTS.md`.
-
-The chief assistant's immutable policy and owner-editable profile are separate instruction layers. The owner may version the assistant's name, form of address, role emphasis, communication style, and working principles. Security, authority, tools, schema validation, canonical storage, and approval policy remain application-owned and cannot be changed by that profile.
-
-### Durable work and scheduling
-
-All assistant turns and scheduled operations use durable jobs with:
-
-- explicit queued, running, waiting-for-approval, blocked, failed, cancelled, and completed states;
-- provider and mutation concurrency limits;
-- timeouts and bounded captured output;
-- idempotency keys and restart reconciliation;
-- evidence of what was attempted and what committed;
-- safe separation between proposal and apply phases.
-
-Scheduled jobs trigger an assistant goal with a fresh bounded context package. They do not depend on an open browser or an indefinitely growing chat history.
-
-## Source adapters and optional historical import
-
-The application owns a source-neutral evidence contract. Normal operation begins with native capture and application-managed records and never requires a legacy vault, synchronized folder, or external source system.
-
-Source adapters may later ingest explicitly authorized historical or external material. An adapter:
-
-1. maps source-specific records into application-owned evidence and import candidates;
-2. keeps source format and location details outside the canonical domain model;
-3. records provenance, content hashes, diagnostics, and source identity;
-4. builds a replaceable derived import index;
-5. remains removable without disabling native operation or invalidating already accepted canonical records.
-
-A legacy WorkOS adapter is one optional implementation of this interface. It is not the default repository, benchmark requirement, runtime mount, or source of domain rules. Its first authorized mode must be read-only. No migration, deletion, rewrite, or external transmission follows from read authorization, and canonical ownership moves only through a later reviewed import decision.
-
-## Remote access
-
-The server stays on `127.0.0.1` and Tailscale Serve proxies private HTTPS. Public port forwarding and Tailscale Funnel are excluded.
-
-The current tailnet has one owner and no other members. Temporary development access may rely on this boundary. Application authentication remains required before external communications, high-impact mutations, or a broader network/user scope is enabled.
-
-## Backup and recovery
-
-The canonical database, evidence store, and configuration need coordinated backup. Export produces readable Markdown and JSON in addition to SQLite backup. Restore tests must cover evidence references, operational state, receipts, and pending job reconciliation.
-
-The product does not promise AI-free operation. Recovery guarantees that when AI returns, the assistants resume from coherent shared state rather than reconstructing the owner's world from chat history.
+Fastify binds to localhost. Tailscale Serve terminates private HTTPS on an explicit port and proxies to the local HTTP service. No Funnel, public reverse proxy, or router forwarding is used.

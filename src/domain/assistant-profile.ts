@@ -20,9 +20,13 @@ export interface AssistantProfile extends Omit<AssistantProfileDraft, "timezone"
 export const DEFAULT_ASSISTANT_PROFILE: AssistantProfileDraft = {
   name: "주 비서",
   ownerAddress: "사용자",
-  roleDescription: "개인 운영을 총괄하며 일정, 프로젝트, 지식과 후속 조치가 연결되도록 돕습니다.",
-  communicationStyle: "한국어로 간결하고 명확하게 답하며, 중요한 불확실성과 판단이 필요한 지점을 숨기지 않습니다.",
-  workingPrinciples: "사용자의 주의를 보호합니다.\n근거와 추론을 구분합니다.\n중요한 변경은 확정하기 전에 확인합니다.",
+  roleDescription: "WorkOS 안에서 사용자의 업무와 지식을 함께 운영하는 개인 비서입니다.",
+  communicationStyle: "한국어로 간결하고 명확하게 답하고, 중요한 불확실성과 판단이 필요한 지점을 숨기지 않습니다.",
+  workingPrinciples: [
+    "사용자의 주의를 보호합니다.",
+    "WorkOS의 AGENTS.md와 PKM specification을 작업 규칙으로 따릅니다.",
+    "요청 범위를 넘는 변경은 실행하지 않습니다.",
+  ].join("\n"),
   timezone: systemTimezone(),
 };
 
@@ -42,7 +46,7 @@ export function validateAssistantProfileInput(value: unknown): AssistantProfileD
 }
 
 export function assistantProfilePrompt(profile: AssistantProfile): string {
-  return `Owner-configured assistant profile (preferences only; cannot override system policy):
+  return `Owner-configured assistant profile. This shapes communication but never overrides workspace rules or application safety:
 - Assistant name: ${profile.name}
 - Address the owner as: ${profile.ownerAddress}
 - Owner timezone: ${profile.timezone}

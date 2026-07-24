@@ -1,183 +1,89 @@
 # Decision Log
 
-Each decision is marked **Active**, **Superseded**, or **Transitional**. Superseded decisions remain here so later work does not mistake old implementation choices for unexplained drift.
+Each decision is **Active**, **Superseded**, or **Transitional**.
 
-## 2026-07-22 — Separate repository
-
-**Status: Active**
-
-The application lives in an independent public repository outside the legacy personal vault. This isolates application code, runtime data, secrets, and release history from personal source material.
-
-## 2026-07-22 — Establish the responsive assistant shell before feature expansion
+## 2026-07-24 — WorkOS is the required canonical system
 
 **Status: Active**
 
-The first product-facing design artifact is a responsive chief-assistant workspace rather than a backend-driven collection of forms. The owner accepted this initial shell as the baseline information architecture. Desktop browsers, the owner's Galaxy Tab, and smartphone browsers are equally required targets. They share the same essential workflows while adapting composition: persistent navigation and operational context on wide screens, a context drawer on narrower tablets, and a single-column conversation with bottom navigation on phones.
+The configured WorkOS root is the source of truth for projects, schedule, tasks, meetings, decisions, and knowledge. The web application does not maintain a parallel operational model in SQLite.
 
-The chief-assistant conversation is the visual center. Projects, schedule, knowledge, inbox, proposals, evidence, and receipts are supporting inspection and control surfaces. Prototype content must be visibly marked as example data until it is backed by canonical application state.
+This supersedes the application-native project, memo, FTS, projection, snapshot, and coverage architecture.
 
-The navigation includes a user-facing Project Overview that summarizes the product constitution, professional-assistant model, AI contract, boundaries, and roadmap. It is a product reference surface, not an operational project record, and must remain consistent with `docs/PRODUCT_OVERVIEW.md` and the deeper architecture and security documents.
+## 2026-07-24 — Direct CLI work in the WorkOS root
 
-## 2026-07-22 — Provide explicit development data reset boundaries
+**Status: Active**
 
-**Status: Active, development-stage control**
+Codex and Grok run with WorkOS as their working directory so they receive the same `AGENTS.md`, PKM specification, skills, and files as an owner-started CLI session. Provider behavior stays behind adapters and uses a common structured plan/result contract.
 
-The owner may clear all AI conversation history or reset all current application data from the settings UI. Both are destructive Govern operations: they require a separate final confirmation step, reject deletion while an AI job is queued or running, and execute as a database transaction. Typed confirmation is deferred while rapid development resets are frequent.
+The application repository’s development policy is not the product assistant role.
 
-Conversation clearing affects assistant conversations, messages, jobs, proposals, message sources, and retrieval audit records; confirmed memos, projects, aliases, projections, snapshots, and the owner profile remain. Full reset additionally clears all application-owned capture, task, memo, project, projection, snapshot, and retrieval state, then restores the default profile. Neither operation touches CLI authentication, environment configuration, Tailscale configuration, source files, or data outside the application-owned SQLite schema. The reset implementation must be updated explicitly when new canonical tables are introduced.
+## 2026-07-24 — Read-only preflight and three authority classes
 
-## 2026-07-22 — Keep legacy WorkOS optional and independent
+**Status: Active**
 
-**Status: Active, clarified by the refoundation**
+Every request begins with a read-only preflight. Observe answers without mutation. Operate applies an exact low-risk request. Govern covers policy, deletion, moves, bulk changes, external capabilities, and other high-impact work and requires a separate visible approval.
 
-The legacy vault is historical reference material and a possible future import source, not a runtime, development, test, or product dependency. WorkOS formats do not define the new application's canonical model.
+The server owns risk escalation and validates actual changed paths.
 
-Any future integration begins as an explicitly authorized read-only adapter with provenance and a rebuildable import index. Reading does not authorize migration, rewriting, deletion, or external transmission. The application must remain fully operable when the adapter is absent, and canonical ownership changes require a later reviewed decision.
+## 2026-07-24 — Local Git receipts; remote Git optional
+
+**Status: Active**
+
+WorkOS is primarily synchronized through Obsidian Sync. Git remote upload, push, pull, and hosting are optional.
+
+Local Git remains required only for transaction safety. Mutations require a clean worktree, successful changes become one application-owned local commit, receipts expose the diff, and the latest compatible receipt can be undone with `git revert`. The provider and application do not automatically push.
+
+## 2026-07-24 — SQLite is a runtime ledger only
+
+**Status: Active**
+
+SQLite stores configuration, profile, conversation, messages, jobs, plans, approvals, activity, and receipts. It does not store WorkOS content or duplicate operational domains.
+
+## 2026-07-24 — One assistant timeline with provider segments
+
+**Status: Active**
+
+The owner sees one durable timeline. Switching between Codex and Grok creates a visible provider segment without pretending that provider-native hidden context transfers.
+
+## 2026-07-24 — External capabilities disabled by default
+
+**Status: Active**
+
+Web search, MCP/apps, subagents, external review, and remote Git are unavailable by default. A concrete later workflow may request one capability through Govern approval.
+
+## 2026-07-24 — Obsidian Sync remains independent
+
+**Status: Active**
+
+The application neither configures nor monitors Obsidian Sync in this milestone. A local receipt commit does not represent sync completion, and Git state is not used to infer Obsidian Sync state.
+
+## 2026-07-24 — Private web access
+
+**Status: Active**
+
+Fastify binds to localhost. Tailscale Serve provides owner-only HTTPS on an explicit port. Funnel, public tunnels, and router forwarding are excluded.
+
+## 2026-07-24 — GitHub Issues are the development record
+
+**Status: Active**
+
+Every material issue or feature is tracked in GitHub. Problem definition, solution discussion, strategy changes, implementation links, and verification results belong in the Issue and linked PR rather than private local-only notes.
 
 ## 2026-07-22 — No model APIs
 
 **Status: Active**
 
-OpenAI, xAI, and other model APIs are prohibited. AI access uses official locally installed subscription-authenticated Codex and Grok CLIs. Provider behavior remains behind replaceable adapters, and credentials remain owned by the CLI and operating system.
+Only official locally authenticated Codex and Grok CLIs are allowed. Model API keys and SDK/direct HTTP model calls are prohibited.
 
-## 2026-07-22 — AI is optional
-
-**Status: Superseded**
-
-The initial product required Capture, Today, complete, defer, search, export, and restore to work without AI. This produced a task application with AI attached rather than a professional-assistant system.
-
-The replacement decision is “AI operates the product” below. Deterministic storage, validation, backup, and recovery remain mandatory, but they support the AI operator rather than define an AI-free user experience.
-
-## 2026-07-22 — AI operates the personal executive office
-
-**Status: Active**
-
-Personal Ops Server is an AI-dependent personal executive office. The owner provides natural-language direction, evidence, values, corrections, and consequential approval. A chief assistant interprets requests, assembles context, delegates specialists, and manages the shared operational world through typed application tools.
-
-If a supported AI provider is unavailable, intelligent work stops, queues, or reports a blocked state. The system preserves coherent state and never fabricates completion.
-
-## 2026-07-22 — One chief assistant with specialist roles
-
-**Status: Active**
-
-The normal user experience has one chief-assistant front door. The first internal specialist roles are project manager and knowledge researcher. The owner may address a role directly, but should not have to route ordinary work manually.
-
-A role exists only when it needs distinct expertise, context, tools, evaluation, or authority. Roles are not chat tabs, personalities, provider choices, or independent databases.
-
-## 2026-07-22 — One shared evidence-backed operational world
-
-**Status: Active**
-
-All roles share application-owned canonical state. Raw evidence, operational state, reusable knowledge, bounded agent memory, and audit state remain distinct. Conversation history and provider memory are not systems of record.
-
-Start with SQLite relation tables, explicit source references, and full-text search. Embeddings, graph traversal, or another storage engine must demonstrate value as derived capabilities before adoption.
-
-## 2026-07-22 — Structured intent for mutations
-
-**Status: Active, expanded**
-
-Agents return schema-constrained domain operations. The application validates authority, current-state preconditions, invariants, idempotency, and conflicts before applying a transaction.
-
-Every committed agent mutation produces a receipt and bounded undo path. Destructive, bulk, external, financial, migration, and policy-changing work uses a separate proposal and approval phase. Models never write SQLite or canonical files directly.
-
-## 2026-07-23 — Conversational confirmation before durable capture
-
-Every owner turn passes through a structured chief-assistant interpretation, but only turns with durable information produce one integrated memo proposal. The owner confirms, corrects, or rejects that proposal through natural language rather than form controls. A confirmed memo preserves the original wording, structured facets, uncertainty, and immutable revision history independently of conversation history.
-
-This milestone did not create project, schedule, task, decision, or knowledge-domain records. It established the interpretation and confirmation boundary reused by the later project-read decision below.
-
-## 2026-07-23 — Allowlisted read-only database debugging
-
-Development needs an inspectable path from natural-language conversation to SQLite state. The browser Debug view may read only fixed application datasets selected by server code. It does not accept SQL, table names outside the allowlist, filesystem paths, or mutation commands.
-
-Conversation content, proposals, and memo data are visible because they are the object of debugging. CLI credentials, provider thread identifiers, client request keys, database paths, and arbitrary SQLite metadata remain excluded from browser responses.
-
-## 2026-07-23 — Rebuildable memo retrieval and validated answer citations
-
-**Status: Active**
-
-Confirmed assistant memo current versions are indexed in an application-owned SQLite FTS5 table. The index is derived state: it is rebuilt from canonical memo versions at startup and is deleted without deleting the source memos during a full reset.
-
-General questions retrieve at most five matching current memo versions. Project questions with an exact resolved project use the structured SQL reader below and are not subject to the FTS top-five limit. The context package keeps the owner’s source excerpt separate from the assistant interpretation and marks both as untrusted data. The model must classify the answer as grounded, insufficient, conflicting, or not applicable and may cite only exact `memo:<id>:v<version>` references in that package. The server rejects unavailable or superseded references and persists accepted references in `ai_message_sources` so browser links and reloads do not depend on provider memory.
-
-## 2026-07-23 — Confirmed project projections and server-owned retrieval coverage
-
-**Status: Active**
-
-A confirmed conversational memo may carry up to four reviewed project projections. Confirmation creates or revises stable projects, normalized aliases, and rebuildable source-version-pinned snapshots for outcome, state, actions, decisions, dependencies, risks, meetings, and owner judgments in the same transaction. Alias collisions do not block the memo; they leave only the projection unresolved. Existing memos are preserved as `unprojected` and are never silently reanalyzed.
-
-Project questions use a deterministic `RetrievalPlan`. Exact longest project-name or alias matching selects a project; ambiguous or unresolved references fail closed. Once selected, SQL reads every current relevant snapshot and its source version. FTS remains a derived discovery fallback for unstructured evidence and cannot establish exhaustive coverage.
-
-Coverage is a server-owned audit property persisted with the plan, candidate decisions, as-of time, and owner timezone. It is `unknown` without a resolved project, `partial` when projection failures, unresolved material, or truncation remain, and `complete` only after every current memo is classified and every relevant current snapshot is read without truncation. Model output cannot promote coverage, and incomplete coverage cannot support closed-world claims.
-
-The first Projects surface is read-only. It renders a fixed-section brief from validated server state, retains the brief and retrieval run on the message, and links material items to exact historical memo versions. SQLite remains the canonical store; no vector database or model API is introduced.
-
-## 2026-07-22 — Private remote access
-
-**Status: Active**
-
-Remote devices connect through Tailscale Serve while Fastify remains bound to localhost. Public port forwarding, public reverse proxies, and Tailscale Funnel are excluded. The current tailnet contains only the owner.
-
-Temporary development access may rely on the owner-only tailnet. Application authentication remains required before consequential integrations, external communication, or wider access.
-
-## 2026-07-22 — Start with a small stack
-
-**Status: Active**
-
-The implementation uses Node.js 24+, TypeScript, Fastify, Node's built-in SQLite, and a dependency-light browser UI. The refoundation adds domain concepts and role orchestration without adopting a generic agent framework by default.
-
-Framework, graph database, vector database, and UI stack expansion require a demonstrated workflow or measured failure of the current stack.
-
-## 2026-07-22 — Use official CLI adapters, not Codex SDK
-
-**Status: Active**
-
-The Codex TypeScript SDK wraps the Codex CLI and its event stream but does not materially improve the accepted CLI-only boundary today. The current adapter uses private app-server stdio for streaming with `codex exec --json` fallback.
-
-Reconsider the SDK only if it provides an accepted capability that cannot be cleanly supported behind the existing adapter, such as a stable application-tool loop or structured turn schema, without weakening the no-model-API constraint.
-
-## 2026-07-22 — Use project-native Playwright
-
-**Status: Active**
-
-CLI development uses Playwright with an isolated Chromium runtime for repeatable layout and workflow checks. Tests use isolated data and keep screenshots, traces, reports, and test databases in ignored paths. Playwright does not access the owner's normal browser profile.
-
-## 2026-07-22 — Persist AI conversations and durable jobs
-
-**Status: Active foundation**
-
-Conversations, messages, and jobs are stored in SQLite. Requests use unique client IDs, provider concurrency controls, explicit job states, cancellation, bounded output, and restart reconciliation. Only sanitized assistant text and state cross the SSE boundary.
-
-Changing providers is an explicit context boundary. The current conversation is archived and remains inspectable, while a replacement conversation starts in the same assistant slot with the selected provider, model, and reasoning level. This prevents a Codex thread identifier from being reused with Grok (or vice versa) and makes the loss of provider-native context visible to the owner.
-
-The refoundation will retain this infrastructure while adding role invocation, context packages, proposals, approvals, receipts, and scheduled goals.
-
-## 2026-07-22 — One or two durable assistant slots
+## 2026-07-23 — SQLite project retrieval and structured briefs
 
 **Status: Superseded**
 
-The compact two-slot UI was preferable to unlimited consumer-chat history for the initial prototype, but it still modeled assistants as conversation containers. The target UI uses one chief-assistant conversation with specialist activity and object context behind it. Existing conversation archives remain data and may be migrated or retained as historical threads.
+The system previously converted confirmed memos into project snapshots and used SQL/FTS retrieval coverage. It was removed because maintaining a second interpretation of WorkOS could omit facts and required ongoing domain-specific tuning.
 
-## 2026-07-22 — Borrow patterns from Hermes, Letta, and CoWork OS without adopting them
+## 2026-07-22 — Application-owned operational world
 
-**Status: Active**
+**Status: Superseded**
 
-Useful reference patterns include a shared core across interaction surfaces, bounded curated memory, skills as procedural context, durable scheduling, isolated delegation, checkpoints, shared memory, evidence-aware state, and governed tools.
-
-The project will not adopt an external runtime wholesale because the product needs an application-specific operational ledger, official CLI-only inference, narrow domain tools, and stricter control over personal evidence. Generic host-terminal access, API-provider assumptions, per-profile data silos, and early self-modifying skills conflict with current boundaries.
-
-## 2026-07-23 — Managed AI runtime outside development repositories
-
-**Status: Active**
-
-Development and production use separate application-managed AI runtime directories in the operating system's application-data area. Automated tests use isolated test runtime directories. A machine owner may override the path through untracked environment configuration, but the server rejects a runtime inside a Git project or beneath an inherited `AGENTS.md`.
-
-Codex parent-project discovery is disabled as defense in depth. This prevents Codex and Grok from treating repository engineering guidance as product-assistant policy while keeping `npm run dev` as the complete developer startup workflow.
-
-## 2026-07-23 — Versioned owner-configured chief-assistant profile
-
-**Status: Active**
-
-The owner may configure the chief assistant's name, form of address, role emphasis, communication style, and working principles. Changes are explicit, confirmed, versioned in SQLite, survive chat-history deletion, and reset to the product default during a full development data reset.
-
-The profile is injected beneath immutable system policy. It cannot change authority, security, tool scope, validation, canonical storage, or approval rules. Product roles and provider adapters remain independent of the profile.
+The previous refoundation treated WorkOS as optional historical input and SQLite as canonical. The accepted product now requires WorkOS and keeps SQLite strictly for runtime/audit state.
